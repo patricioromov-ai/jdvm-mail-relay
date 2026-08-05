@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Comunicados — JDVM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1F2A44; --ink-soft:#4A5568; --paper:#EAEAE4; --paper-card:#F5F5F0; --line:#D8D8D0;
+    --torre-a:#C1544B; --torre-b:#3F7D6B; --torre-c:#C98A2C; --torre-d:#5B4B8A;
+    --ok:#3F7D6B; --warn:#C98A2C; --pending:#8A8A80; --err:#C1544B;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.5;}
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;margin:0;letter-spacing:-0.01em;}
+  .mono{font-family:'IBM Plex Mono',monospace;font-size:0.8em;}
+  .app{display:flex;min-height:100vh;}
+  .sidebar{width:230px;flex-shrink:0;background:var(--ink);color:#EDEDE6;display:flex;flex-direction:column;padding:24px 0;}
+  .sidebar .brand{padding:0 20px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.12);margin-bottom:16px;}
+  .sidebar .brand h1{font-size:1.15rem;color:#fff;}
+  .sidebar .brand p{margin:4px 0 0;font-size:0.75rem;color:#B8BDC9;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:11px 20px;cursor:pointer;font-size:0.9rem;color:#C7CBD6;border-left:3px solid transparent;transition:background 0.15s;}
+  .nav-item:hover{background:rgba(255,255,255,0.05);}
+  .nav-item.active{background:rgba(255,255,255,0.08);color:#fff;border-left-color:var(--torre-c);}
+  .nav-item .ic{width:16px;text-align:center;opacity:0.85;}
+  .sidebar .foot{margin-top:auto;padding:14px 20px 0;border-top:1px solid rgba(255,255,255,0.12);font-size:0.72rem;color:#8890A0;}
+  .content{flex:1;padding:32px 40px;max-width:1100px;}
+  .view{display:none;}
+  .view.active{display:block;}
+  .topline{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;gap:12px;flex-wrap:wrap;}
+  .topline p{margin:4px 0 0;color:var(--ink-soft);font-size:0.9rem;}
+  .tag{background:#fff;border:1px solid var(--line);color:var(--ink-soft);font-size:0.72rem;padding:4px 10px;border-radius:20px;font-family:'IBM Plex Mono',monospace;}
+  .tag.err{background:#F7E4E4;color:var(--err);border-color:var(--err);}
+  .grid-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;}
+  .stat-card{background:var(--paper-card);border:1px solid var(--line);border-radius:6px;padding:16px 18px;}
+  .stat-card .num{font-family:'Fraunces',serif;font-size:1.8rem;font-weight:600;}
+  .stat-card .lbl{font-size:0.78rem;color:var(--ink-soft);margin-top:2px;}
+  .card{background:var(--paper-card);border:1px solid var(--line);border-radius:6px;padding:20px 22px;margin-bottom:20px;}
+  .card h3{font-size:1.05rem;margin-bottom:14px;}
+  table{width:100%;border-collapse:collapse;font-size:0.87rem;}
+  th{text-align:left;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);border-bottom:1px solid var(--line);padding:8px 10px;font-weight:600;}
+  td{padding:10px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .torre-tab{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;}
+  .a{background:var(--torre-a);} .b{background:var(--torre-b);} .c{background:var(--torre-c);} .d{background:var(--torre-d);}
+  .badge{display:inline-block;font-size:0.72rem;padding:2px 9px;border-radius:20px;font-weight:500;}
+  .badge.propietario{background:#E4EEE9;color:var(--torre-b);}
+  .badge.arrendatario{background:#F2E8DA;color:var(--torre-c);}
+  .badge.comunicado{background:#E7E9F0;color:var(--ink-soft);}
+  .badge.encuesta{background:#EDE3F5;color:var(--torre-d);}
+  .badge.enviada{background:#E4EEE9;color:var(--torre-b);}
+  .badge.programada{background:#F2E8DA;color:var(--torre-c);}
+  .badge.borrador{background:#EAEAE4;color:var(--pending);}
+  .icon-btn{background:none;border:1px solid var(--line);border-radius:5px;padding:5px 9px;cursor:pointer;font-size:0.8rem;color:var(--ink-soft);}
+  .icon-btn:hover{border-color:var(--ink-soft);color:var(--ink);}
+  .icon-btn:disabled{opacity:0.5;cursor:default;}
+  .icon-btn:focus-visible,.nav-item:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--torre-c);outline-offset:2px;}
+  .subtabs{display:flex;gap:6px;margin-bottom:16px;}
+  .subtab{padding:6px 14px;font-size:0.83rem;border-radius:5px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--ink-soft);}
+  .subtab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .form-row{margin-bottom:16px;}
+  .form-row label{display:block;font-size:0.8rem;font-weight:600;margin-bottom:6px;color:var(--ink-soft);}
+  .form-row select,.form-row input[type=text],.form-row input[type=email],.form-row input[type=datetime-local],.form-row textarea{
+    width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:5px;font-family:'Inter',sans-serif;font-size:0.87rem;background:#fff;color:var(--ink);
+  }
+  .form-row textarea{min-height:90px;font-family:'IBM Plex Mono',monospace;font-size:0.82rem;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .check-group{display:flex;flex-wrap:wrap;gap:10px;}
+  .check-group label{display:flex;align-items:center;gap:6px;font-size:0.83rem;font-weight:400;border:1px solid var(--line);padding:6px 12px;border-radius:20px;background:#fff;cursor:pointer;}
+  .type-toggle{display:flex;gap:8px;}
+  .type-toggle .opt{flex:1;text-align:center;padding:10px;border:1px solid var(--line);border-radius:5px;cursor:pointer;font-size:0.85rem;background:#fff;}
+  .type-toggle .opt.sel{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .btn-primary{background:var(--ink);color:#fff;border:none;padding:10px 20px;border-radius:5px;font-size:0.87rem;font-weight:500;cursor:pointer;}
+  .btn-primary:hover{background:#151d33;}
+  .btn-primary:disabled{opacity:0.5;cursor:default;}
+  .bar-row{margin-bottom:10px;}
+  .bar-row .lbl-line{display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:4px;}
+  .bar-track{background:#E4E4DC;border-radius:4px;height:8px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--torre-d);border-radius:4px;}
+  .bar-fill.alt{background:var(--torre-b);}
+  .quote-answer{background:#fff;border:1px solid var(--line);border-radius:5px;padding:10px 12px;font-size:0.84rem;margin-bottom:8px;color:var(--ink-soft);}
+  .empty{color:var(--pending);font-size:0.85rem;padding:10px 0;}
+  .config-banner{background:#F7E4E4;border:1px solid var(--err);color:var(--err);padding:14px 18px;border-radius:6px;margin-bottom:20px;font-size:0.85rem;}
+  @media(prefers-reduced-motion: reduce){*{transition:none !important;}}
+  @media (max-width: 780px){
+    .app{flex-direction:column;} .sidebar{width:100%;flex-direction:row;overflow-x:auto;padding:12px 0;}
+    .sidebar .brand,.sidebar .foot{display:none;}
+    .nav-item{border-left:none;border-bottom:3px solid transparent;white-space:nowrap;}
+    .nav-item.active{border-bottom-color:var(--torre-c);}
+    .content{padding:20px;} .grid-stats{grid-template-columns:repeat(2,1fr);} .form-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand"><h1>Comunicados</h1><p>Comunidad · Torres A–D</p></div>
+    <nav>
+      <div class="nav-item active" data-view="panel"><span class="ic">▤</span> Panel</div>
+      <div class="nav-item" data-view="contactos"><span class="ic">☰</span> Contactos</div>
+      <div class="nav-item" data-view="plantillas"><span class="ic">✎</span> Plantillas</div>
+      <div class="nav-item" data-view="campanas"><span class="ic">✉</span> Campañas</div>
+      <div class="nav-item" data-view="encuestas"><span class="ic">◔</span> Encuestas</div>
+      <div class="nav-item" data-view="seguimiento"><span class="ic">↗</span> Seguimiento</div>
+    </nav>
+    <div class="foot">contacto@jdvm.cl</div>
+  </aside>
+
+  <main class="content">
+
+    <div id="config-banner" class="config-banner" style="display:none;"></div>
+
+    <!-- PANEL -->
+    <section class="view active" id="view-panel">
+      <div class="topline"><div><h2>Panel general</h2><p>Resumen de actividad de comunicados</p></div></div>
+      <div class="grid-stats">
+        <div class="stat-card"><div class="num" id="stat-residentes">—</div><div class="lbl">Contactos residentes</div></div>
+        <div class="stat-card"><div class="num" id="stat-externos">—</div><div class="lbl">Contactos externos</div></div>
+        <div class="stat-card"><div class="num" id="stat-programadas">—</div><div class="lbl">Campañas programadas</div></div>
+        <div class="stat-card"><div class="num" id="stat-apertura">—</div><div class="lbl">Apertura última campaña</div></div>
+      </div>
+      <div class="card">
+        <h3>Campañas</h3>
+        <div id="panel-campanas"><p class="empty">Cargando...</p></div>
+      </div>
+    </section>
+
+    <!-- CONTACTOS -->
+    <section class="view" id="view-contactos">
+      <div class="topline">
+        <div><h2>Contactos</h2><p>Base de residentes y contactos externos</p></div>
+        <button class="icon-btn" onclick="toggleForm('form-contacto')">＋ Nuevo contacto</button>
+      </div>
+
+      <div class="card" id="form-contacto" style="display:none;">
+        <h3>Nuevo contacto — residente</h3>
+        <div class="form-grid">
+          <div class="form-row"><label>Nombre</label><input type="text" id="c-nombre"></div>
+          <div class="form-row"><label>Email</label><input type="email" id="c-email"></div>
+          <div class="form-row"><label>Torre</label>
+            <select id="c-torre"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+          </div>
+          <div class="form-row"><label>Tipo</label>
+            <select id="c-tipo"><option value="propietario">Propietario</option><option value="arrendatario">Arrendatario</option></select>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="crearContacto()">Guardar contacto</button>
+      </div>
+
+      <div class="subtabs">
+        <div class="subtab active" data-sub="residentes">Residentes</div>
+        <div class="subtab" data-sub="externos">Autoridades / Organizaciones</div>
+      </div>
+
+      <div class="card" id="sub-residentes"><div id="tabla-contactos"><p class="empty">Cargando...</p></div></div>
+
+      <div class="card" id="sub-externos" style="display:none;">
+        <button class="icon-btn" style="margin-bottom:14px;" onclick="toggleForm('form-externo')">＋ Nuevo contacto externo</button>
+        <div id="form-externo" style="display:none;margin-bottom:16px;">
+          <div class="form-grid">
+            <div class="form-row"><label>Nombre</label><input type="text" id="ce-nombre"></div>
+            <div class="form-row"><label>Organización</label><input type="text" id="ce-org"></div>
+            <div class="form-row"><label>Cargo</label><input type="text" id="ce-cargo"></div>
+            <div class="form-row"><label>Email</label><input type="email" id="ce-email"></div>
+          </div>
+          <button class="btn-primary" onclick="crearExterno()">Guardar</button>
+        </div>
+        <div id="tabla-externos"><p class="empty">Cargando...</p></div>
+      </div>
+    </section>
+
+    <!-- PLANTILLAS -->
+    <section class="view" id="view-plantillas">
+      <div class="topline">
+        <div><h2>Plantillas</h2><p>Reutilizables, con variables de personalización</p></div>
+        <button class="icon-btn" onclick="toggleForm('form-plantilla')">＋ Nueva plantilla</button>
+      </div>
+      <div class="card" id="form-plantilla" style="display:none;">
+        <div class="form-row"><label>Nombre</label><input type="text" id="p-nombre"></div>
+        <div class="form-row"><label>Asunto</label><input type="text" id="p-asunto"></div>
+        <div class="form-row"><label>Cuerpo HTML — usa {{nombre}}, {{torre}}, {{link_encuesta}}</label><textarea id="p-cuerpo"></textarea></div>
+        <button class="btn-primary" onclick="crearPlantilla()">Guardar plantilla</button>
+      </div>
+      <div class="card"><div id="tabla-plantillas"><p class="empty">Cargando...</p></div></div>
+    </section>
+
+    <!-- CAMPAÑAS -->
+    <section class="view" id="view-campanas">
+      <div class="topline"><div><h2>Nueva campaña</h2><p>Comunicado directo o encuesta con respuestas</p></div></div>
+      <div class="card">
+        <div class="form-row"><label>Nombre de la campaña</label><input type="text" id="cam-nombre"></div>
+        <div class="form-row">
+          <label>Tipo de campaña</label>
+          <div class="type-toggle">
+            <div class="opt sel" data-tipo="comunicado">Comunicado</div>
+            <div class="opt" data-tipo="encuesta">Encuesta / Consulta</div>
+          </div>
+        </div>
+        <div class="form-row"><label>Plantilla</label><select id="cam-plantilla"><option value="">Cargando...</option></select></div>
+        <div class="form-row">
+          <label>Segmento — Residentes</label>
+          <div class="check-group" id="cam-torres">
+            <label><input type="checkbox" value="A" checked><span class="torre-tab a"></span>Torre A</label>
+            <label><input type="checkbox" value="B" checked><span class="torre-tab b"></span>Torre B</label>
+            <label><input type="checkbox" value="C" checked><span class="torre-tab c"></span>Torre C</label>
+            <label><input type="checkbox" value="D" checked><span class="torre-tab d"></span>Torre D</label>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Filtrar por tipo (deja ambos sin marcar para incluir todos)</label>
+          <div class="check-group" id="cam-tipos">
+            <label><input type="checkbox" value="propietario"> Solo propietarios</label>
+            <label><input type="checkbox" value="arrendatario"> Solo arrendatarios</label>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Incluir también</label>
+          <div class="check-group"><label><input type="checkbox" id="cam-externos"> Contactos externos (autoridades/organizaciones)</label></div>
+        </div>
+        <div class="form-row"><label>Programar envío (vacío = queda en borrador)</label><input type="datetime-local" id="cam-fecha"></div>
+        <button class="btn-primary" onclick="crearCampana()">Guardar campaña</button>
+        <span id="cam-msg" class="tag" style="margin-left:10px;display:none;"></span>
+      </div>
+
+      <div class="card">
+        <h3>Campañas existentes</h3>
+        <div id="tabla-campanas"><p class="empty">Cargando...</p></div>
+      </div>
+    </section>
+
+    <!-- ENCUESTAS -->
+    <section class="view" id="view-encuestas">
+      <div class="topline"><div><h2>Resultados de encuestas</h2><p>Selecciona una campaña tipo encuesta</p></div></div>
+      <div class="card">
+        <div class="form-row"><label>Campaña</label><select id="enc-select" onchange="cargarResultadosEncuesta()"><option value="">Selecciona...</option></select></div>
+      </div>
+      <div id="enc-resultados"></div>
+    </section>
+
+    <!-- SEGUIMIENTO -->
+    <section class="view" id="view-seguimiento">
+      <div class="topline"><div><h2>Seguimiento de envíos</h2><p>Aperturas y clics por campaña</p></div></div>
+      <div class="card"><div id="tabla-seguimiento"><p class="empty">Cargando...</p></div></div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+// ========= CONFIGURACIÓN =========
+// Pega aquí la URL de tu implementación de Apps Script (paso 4 de la guía)
+// y la clave API_SECRET que tú definiste en las Propiedades del script.
+// No compartas esta clave en el chat ni en ningún lugar público.
+const CONFIG = {
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
+  API_SECRET: 'comunicacion_jdvm'
+};
+
+let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [];
+let campanaTipoSeleccionado = 'comunicado';
+
+if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
+  const banner = document.getElementById('config-banner');
+  banner.style.display = 'block';
+  banner.textContent = '⚠ Falta configurar API_SECRET en el código (línea CONFIG, arriba). Edita el archivo y reemplaza PON_AQUI_TU_API_SECRET por la clave que definiste en Apps Script.';
+}
+
+async function api(action, payload) {
+  try {
+    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain;charset=utf-8'}, // evita preflight CORS con Apps Script
+      body: JSON.stringify({ secret: CONFIG.API_SECRET, action, payload: payload || {} })
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    return data.data !== undefined ? data.data : data;
+  } catch (err) {
+    console.error(action, err);
+    mostrarErrorGlobal('Error en "' + action + '": ' + err.message);
+    throw err;
+  }
+}
+
+function mostrarErrorGlobal(msg) {
+  const banner = document.getElementById('config-banner');
+  banner.style.display = 'block';
+  banner.textContent = '⚠ ' + msg;
+}
+
+// ========= NAVEGACIÓN =========
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('view-'+item.dataset.view).classList.add('active');
+  });
+});
+document.querySelectorAll('.subtab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.subtab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('sub-residentes').style.display = tab.dataset.sub==='residentes' ? 'block':'none';
+    document.getElementById('sub-externos').style.display = tab.dataset.sub==='externos' ? 'block':'none';
+  });
+});
+document.querySelectorAll('.type-toggle .opt').forEach(opt=>{
+  opt.addEventListener('click', ()=>{
+    opt.parentElement.querySelectorAll('.opt').forEach(o=>o.classList.remove('sel'));
+    opt.classList.add('sel');
+    campanaTipoSeleccionado = opt.dataset.tipo;
+  });
+});
+function toggleForm(id){
+  const el = document.getElementById(id);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// ========= CARGA INICIAL =========
+async function cargarTodo(){
+  try{
+    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs] = await Promise.all([
+      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs')
+    ]);
+    renderPanel(); renderContactos(); renderExternos(); renderPlantillas();
+    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento();
+  }catch(e){ /* el error ya se muestra en el banner */ }
+}
+cargarTodo();
+
+// ========= PANEL =========
+function renderPanel(){
+  document.getElementById('stat-residentes').textContent = cacheContactos.length;
+  document.getElementById('stat-externos').textContent = cacheExternos.length;
+  document.getElementById('stat-programadas').textContent = cacheCampanas.filter(c=>c.estado==='programada').length;
+
+  const enviadas = cacheCampanas.filter(c=>c.estado==='enviada');
+  let aperturaTxt = '—';
+  if (enviadas.length){
+    const ultima = enviadas[enviadas.length-1];
+    const logsUltima = cacheLogs.filter(l=>String(l.campanaId)===String(ultima.id));
+    const enviosN = logsUltima.filter(l=>l.tipo==='envio').length;
+    const aperturasN = new Set(logsUltima.filter(l=>l.tipo==='apertura').map(l=>l.contactoId)).size;
+    aperturaTxt = enviosN ? Math.round(aperturasN/enviosN*100)+'%' : '—';
+  }
+  document.getElementById('stat-apertura').textContent = aperturaTxt;
+
+  const cont = document.getElementById('panel-campanas');
+  if (!cacheCampanas.length){ cont.innerHTML = '<p class="empty">Aún no hay campañas creadas.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th></tr>' +
+    cacheCampanas.map(c=>`<tr><td>${esc(c.nombre)}</td><td><span class="badge ${c.tipo}">${c.tipo}</span></td>
+    <td><span class="badge ${c.estado}">${c.estado}</span></td><td class="mono">${esc(c.fechaProgramada)||'—'}</td></tr>`).join('') + '</table>';
+}
+
+// ========= CONTACTOS =========
+function renderContactos(){
+  const cont = document.getElementById('tabla-contactos');
+  if (!cacheContactos.length){ cont.innerHTML = '<p class="empty">Sin contactos aún. Agrega el primero arriba.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Torre</th><th>Tipo</th><th>Email</th><th></th></tr>' +
+    cacheContactos.map(c=>`<tr><td>${esc(c.nombre)}</td><td><span class="torre-tab ${String(c.torre).toLowerCase()}"></span>${esc(c.torre)}</td>
+    <td><span class="badge ${c.tipo}">${c.tipo==='propietario'?'Propietario':'Arrendatario'}</span></td>
+    <td class="mono">${esc(c.email)}</td>
+    <td><button class="icon-btn" onclick="abrirEnvioIndividual(${c.id}, false)">Enviar ✉</button></td></tr>`).join('') + '</table>';
+}
+async function crearContacto(){
+  const payload = {
+    nombre: document.getElementById('c-nombre').value,
+    email: document.getElementById('c-email').value,
+    torre: document.getElementById('c-torre').value,
+    tipo: document.getElementById('c-tipo').value,
+    etiquetas: '', activo: 'si'
+  };
+  if(!payload.nombre || !payload.email) return alert('Nombre y email son obligatorios');
+  await api('addContacto', payload);
+  document.getElementById('c-nombre').value=''; document.getElementById('c-email').value='';
+  await cargarTodo();
+  toggleForm('form-contacto');
+}
+
+// ========= CONTACTOS EXTERNOS =========
+function renderExternos(){
+  const cont = document.getElementById('tabla-externos');
+  if (!cacheExternos.length){ cont.innerHTML = '<p class="empty">Sin contactos externos aún.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Organización</th><th>Cargo</th><th>Email</th><th></th></tr>' +
+    cacheExternos.map(c=>`<tr><td>${esc(c.nombre)}</td><td>${esc(c.organizacion)}</td><td>${esc(c.cargo)}</td>
+    <td class="mono">${esc(c.email)}</td><td><button class="icon-btn" onclick="abrirEnvioIndividual(${c.id}, true)">Enviar ✉</button></td></tr>`).join('') + '</table>';
+}
+async function crearExterno(){
+  const payload = {
+    nombre: document.getElementById('ce-nombre').value,
+    organizacion: document.getElementById('ce-org').value,
+    cargo: document.getElementById('ce-cargo').value,
+    email: document.getElementById('ce-email').value,
+    notas: ''
+  };
+  if(!payload.nombre || !payload.email) return alert('Nombre y email son obligatorios');
+  await api('addContactoExterno', payload);
+  await cargarTodo();
+  toggleForm('form-externo');
+}
+
+// ========= ENVÍO INDIVIDUAL =========
+async function abrirEnvioIndividual(contactoId, esExterno){
+  if (!cachePlantillas.length) return alert('Primero crea al menos una plantilla.');
+  const nombres = cachePlantillas.map((p,i)=>`${i+1}) ${p.nombre}`).join('\n');
+  const idx = prompt('¿Con qué plantilla envías?\n' + nombres + '\n\nEscribe el número:');
+  if (!idx) return;
+  const plantilla = cachePlantillas[parseInt(idx,10)-1];
+  if (!plantilla) return alert('Opción inválida');
+  const btnTxt = 'Enviando...';
+  try{
+    const resultado = await api('enviarIndividual', { contactoId, esExterno, plantillaId: plantilla.id });
+    alert(resultado.success ? '✔ Enviado correctamente.' : '✘ Error: ' + resultado.error);
+    await cargarTodo();
+  }catch(e){ /* error ya mostrado */ }
+}
+
+// ========= PLANTILLAS =========
+function renderPlantillas(){
+  const cont = document.getElementById('tabla-plantillas');
+  if (!cachePlantillas.length){ cont.innerHTML = '<p class="empty">Sin plantillas aún. Crea la primera arriba.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Asunto</th></tr>' +
+    cachePlantillas.map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.asunto)}</td></tr>`).join('') + '</table>';
+}
+function renderSelectPlantillas(){
+  const sel = document.getElementById('cam-plantilla');
+  sel.innerHTML = cachePlantillas.length
+    ? cachePlantillas.map(p=>`<option value="${p.id}">${esc(p.nombre)}</option>`).join('')
+    : '<option value="">Crea una plantilla primero</option>';
+}
+async function crearPlantilla(){
+  const payload = {
+    nombre: document.getElementById('p-nombre').value,
+    asunto: document.getElementById('p-asunto').value,
+    cuerpoHtml: document.getElementById('p-cuerpo').value,
+    adjuntoUrl: ''
+  };
+  if(!payload.nombre || !payload.asunto || !payload.cuerpoHtml) return alert('Completa nombre, asunto y cuerpo');
+  await api('addPlantilla', payload);
+  await cargarTodo();
+  toggleForm('form-plantilla');
+}
+
+// ========= CAMPAÑAS =========
+function renderCampanas(){
+  const cont = document.getElementById('tabla-campanas');
+  if (!cacheCampanas.length){ cont.innerHTML = '<p class="empty">Sin campañas aún.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th><th></th></tr>' +
+    cacheCampanas.map(c=>{
+      const btn = c.estado==='borrador' || c.estado==='programada'
+        ? `<button class="icon-btn" onclick="enviarCampanaAhora(${c.id})">Enviar ahora</button>` : '—';
+      return `<tr><td>${esc(c.nombre)}</td><td><span class="badge ${c.tipo}">${c.tipo}</span></td>
+      <td><span class="badge ${c.estado}">${c.estado}</span></td><td class="mono">${esc(c.fechaProgramada)||'—'}</td><td>${btn}</td></tr>`;
+    }).join('') + '</table>';
+}
+async function crearCampana(){
+  const nombre = document.getElementById('cam-nombre').value;
+  const plantillaId = document.getElementById('cam-plantilla').value;
+  if(!nombre || !plantillaId) return alert('Falta nombre o plantilla');
+
+  const torres = Array.from(document.querySelectorAll('#cam-torres input:checked')).map(i=>i.value);
+  const tipos = Array.from(document.querySelectorAll('#cam-tipos input:checked')).map(i=>i.value);
+  const externos = document.getElementById('cam-externos').checked;
+  const fecha = document.getElementById('cam-fecha').value;
+
+  const segmento = JSON.stringify({ torres, tipos, externos });
+  const payload = {
+    nombre, tipo: campanaTipoSeleccionado, plantillaId, segmento,
+    fechaProgramada: fecha ? fecha.replace('T',' ') : '',
+    estado: fecha ? 'programada' : 'borrador',
+    escalonado: 'no'
+  };
+  await api('addCampana', payload);
+  const msg = document.getElementById('cam-msg');
+  msg.style.display='inline-block'; msg.textContent='✔ Campaña guardada';
+  document.getElementById('cam-nombre').value='';
+  await cargarTodo();
+}
+async function enviarCampanaAhora(id){
+  if (!confirm('¿Enviar esta campaña ahora a todos los destinatarios del segmento?')) return;
+  try{
+    const r = await api('enviarCampanaAhora', { id });
+    alert(`Enviados: ${r.enviados} · Fallidos: ${r.fallidos}`);
+    await cargarTodo();
+  }catch(e){}
+}
+
+// ========= ENCUESTAS =========
+function renderSelectEncuestas(){
+  const sel = document.getElementById('enc-select');
+  const encuestas = cacheCampanas.filter(c=>c.tipo==='encuesta');
+  sel.innerHTML = '<option value="">Selecciona...</option>' +
+    encuestas.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+}
+async function cargarResultadosEncuesta(){
+  const id = document.getElementById('enc-select').value;
+  const cont = document.getElementById('enc-resultados');
+  if (!id){ cont.innerHTML=''; return; }
+  cont.innerHTML = '<p class="empty">Cargando...</p>';
+  try{
+    const resultados = await api('resultadosEncuesta', { campanaId: id });
+    if (!resultados.length){ cont.innerHTML = '<p class="empty">Esta encuesta aún no tiene preguntas registradas.</p>'; return; }
+    cont.innerHTML = resultados.map(r=>{
+      if (r.tipo === 'texto_libre'){
+        const items = r.respuestas.length
+          ? r.respuestas.map(t=>`<div class="quote-answer">${esc(t)}</div>`).join('')
+          : '<p class="empty">Sin respuestas todavía.</p>';
+        return `<div class="card"><h3>${esc(r.pregunta)}</h3>${items}</div>`;
+      }
+      const total = r.total || 1;
+      const barras = Object.keys(r.conteo).map(op=>{
+        const pct = Math.round(r.conteo[op]/total*100);
+        return `<div class="bar-row"><div class="lbl-line"><span>${esc(op)}</span><span>${pct}%</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;"></div></div></div>`;
+      }).join('');
+      return `<div class="card"><h3>${esc(r.pregunta)}</h3>${barras || '<p class="empty">Sin respuestas todavía.</p>'}</div>`;
+    }).join('');
+  }catch(e){ cont.innerHTML = '<p class="empty">No se pudieron cargar los resultados.</p>'; }
+}
+
+// ========= SEGUIMIENTO =========
+function renderSeguimiento(){
+  const cont = document.getElementById('tabla-seguimiento');
+  if (!cacheCampanas.length){ cont.innerHTML = '<p class="empty">Sin campañas aún.</p>'; return; }
+  const filas = cacheCampanas.map(c=>{
+    const logs = cacheLogs.filter(l=>String(l.campanaId)===String(c.id));
+    const enviados = logs.filter(l=>l.tipo==='envio').length;
+    const entregados = logs.filter(l=>l.tipo==='envio' && l.estado==='entregado').length;
+    const fallidos = logs.filter(l=>l.tipo==='envio' && l.estado==='fallo').length;
+    const abiertos = new Set(logs.filter(l=>l.tipo==='apertura').map(l=>l.contactoId)).size;
+    const clics = new Set(logs.filter(l=>l.tipo==='clic').map(l=>l.contactoId)).size;
+    const pct = n => enviados ? Math.round(n/enviados*100)+'%' : '—';
+    return `<tr><td>${esc(c.nombre)}</td><td class="mono">${enviados}</td><td class="mono">${entregados}</td>
+    <td class="mono">${fallidos}</td><td class="mono">${pct(abiertos)}</td><td class="mono">${pct(clics)}</td></tr>`;
+  }).join('');
+  cont.innerHTML = '<table><tr><th>Campaña</th><th>Enviados</th><th>Entregados</th><th>Fallidos</th><th>Abiertos</th><th>Clics</th></tr>' + filas + '</table>';
+}
+
+// ========= UTIL =========
+function esc(s){
+  if (s===undefined || s===null) return '';
+  return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+</script>
+</body>
+</html>
