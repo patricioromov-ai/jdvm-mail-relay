@@ -97,7 +97,7 @@
 <div class="app">
 
   <aside class="sidebar">
-    <div class="brand"><h1>Comunicados</h1><p>Comunidad · Torres A–D</p></div>
+    <div class="brand"><img id="sidebar-logo" style="max-width:100%;display:none;margin-bottom:8px;" alt="Logo"><h1>Comunicados</h1><p>Comunidad · Torres A–D</p></div>
     <nav>
       <div class="nav-item active" data-view="panel"><span class="ic">▤</span> Panel</div>
       <div class="nav-item" data-view="contactos"><span class="ic">☰</span> Contactos</div>
@@ -105,6 +105,7 @@
       <div class="nav-item" data-view="campanas"><span class="ic">✉</span> Campañas</div>
       <div class="nav-item" data-view="encuestas"><span class="ic">◔</span> Encuestas</div>
       <div class="nav-item" data-view="seguimiento"><span class="ic">↗</span> Seguimiento</div>
+      <div class="nav-item" data-view="config"><span class="ic">⚙</span> Configuración</div>
     </nav>
     <div class="foot">contacto@jdvm.cl</div>
   </aside>
@@ -136,7 +137,8 @@
       </div>
 
       <div class="card" id="form-contacto" style="display:none;">
-        <h3>Nuevo contacto — residente</h3>
+        <h3 id="form-contacto-titulo">Nuevo contacto — residente</h3>
+        <input type="hidden" id="c-id">
         <div class="form-grid">
           <div class="form-row"><label>Nombre</label><input type="text" id="c-nombre"></div>
           <div class="form-row"><label>Email</label><input type="email" id="c-email"></div>
@@ -147,7 +149,7 @@
             <select id="c-tipo"><option value="propietario">Propietario</option><option value="arrendatario">Arrendatario</option></select>
           </div>
         </div>
-        <button class="btn-primary" onclick="crearContacto()">Guardar contacto</button>
+        <button class="btn-primary" onclick="guardarContacto()">Guardar contacto</button>
       </div>
 
       <div class="subtabs">
@@ -160,6 +162,7 @@
       <div class="card" id="sub-externos" style="display:none;">
         <button class="icon-btn" style="margin-bottom:14px;" onclick="toggleForm('form-externo')">＋ Nuevo contacto externo</button>
         <div id="form-externo" style="display:none;margin-bottom:16px;">
+          <input type="hidden" id="ce-id">
           <div class="form-grid">
             <div class="form-row"><label>Nombre</label><input type="text" id="ce-nombre"></div>
             <div class="form-row"><label>Organización</label><input type="text" id="ce-org"></div>
@@ -179,10 +182,11 @@
         <button class="icon-btn" onclick="toggleForm('form-plantilla')">＋ Nueva plantilla</button>
       </div>
       <div class="card" id="form-plantilla" style="display:none;">
+        <input type="hidden" id="p-id">
         <div class="form-row"><label>Nombre</label><input type="text" id="p-nombre"></div>
         <div class="form-row"><label>Asunto</label><input type="text" id="p-asunto"></div>
-        <div class="form-row"><label>Cuerpo HTML — usa {{nombre}}, {{torre}}, {{link_encuesta}}</label><textarea id="p-cuerpo"></textarea></div>
-        <button class="btn-primary" onclick="crearPlantilla()">Guardar plantilla</button>
+        <div class="form-row"><label>Cuerpo HTML — usa {{nombre}}, {{torre}}, {{link_encuesta}}, {{logo}}, {{firma}}</label><textarea id="p-cuerpo"></textarea></div>
+        <button class="btn-primary" onclick="guardarPlantilla()">Guardar plantilla</button>
       </div>
       <div class="card"><div id="tabla-plantillas"><p class="empty">Cargando...</p></div></div>
     </section>
@@ -246,6 +250,28 @@
       <div class="card"><div id="tabla-seguimiento"><p class="empty">Cargando...</p></div></div>
     </section>
 
+    <!-- CONFIGURACIÓN -->
+    <section class="view" id="view-config">
+      <div class="topline"><div><h2>Configuración</h2><p>Logo y firma — se aplican automáticamente a todos los correos</p></div></div>
+      <div class="card">
+        <div class="form-row">
+          <label>URL del logo</label>
+          <input type="text" id="cfg-logo" placeholder="https://tuusuario.github.io/turepo/logo.jpeg">
+        </div>
+        <div style="margin-bottom:16px;"><img id="cfg-logo-preview" style="max-height:80px;display:none;"></div>
+        <div class="form-row">
+          <label>Firma (HTML) — se agrega al final de cada correo automáticamente</label>
+          <textarea id="cfg-firma" placeholder="Ej: &lt;p&gt;Comunidad Jardines de Vicuña Mackenna&lt;br&gt;contacto@jdvm.cl&lt;/p&gt;"></textarea>
+        </div>
+        <button class="btn-primary" onclick="guardarConfig()">Guardar configuración</button>
+        <span id="cfg-msg" class="tag" style="margin-left:10px;display:none;"></span>
+      </div>
+      <div class="card">
+        <h3>Vista previa de la firma</h3>
+        <div id="cfg-firma-preview" style="background:#fff;border:1px solid var(--line);border-radius:5px;padding:12px;"></div>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -256,10 +282,10 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
-let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [];
+let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {};
 let campanaTipoSeleccionado = 'comunicado';
 
 if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
@@ -323,11 +349,11 @@ function toggleForm(id){
 // ========= CARGA INICIAL =========
 async function cargarTodo(){
   try{
-    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs] = await Promise.all([
-      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs')
+    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig] = await Promise.all([
+      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig')
     ]);
     renderPanel(); renderContactos(); renderExternos(); renderPlantillas();
-    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento();
+    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig();
   }catch(e){ /* el error ya se muestra en el banner */ }
 }
 cargarTodo();
@@ -364,9 +390,31 @@ function renderContactos(){
     cacheContactos.map(c=>`<tr><td>${esc(c.nombre)}</td><td><span class="torre-tab ${String(c.torre).toLowerCase()}"></span>${esc(c.torre)}</td>
     <td><span class="badge ${c.tipo}">${c.tipo==='propietario'?'Propietario':'Arrendatario'}</span></td>
     <td class="mono">${esc(c.email)}</td>
-    <td><button class="icon-btn" onclick="abrirEnvioIndividual(${c.id}, false)">Enviar ✉</button></td></tr>`).join('') + '</table>';
+    <td>
+      <button class="icon-btn" onclick="abrirEnvioIndividual(${c.id}, false)">Enviar ✉</button>
+      <button class="icon-btn" onclick="editarContacto(${c.id})">Editar</button>
+      <button class="icon-btn" onclick="eliminarContacto(${c.id})">Eliminar</button>
+    </td></tr>`).join('') + '</table>';
 }
-async function crearContacto(){
+function editarContacto(id){
+  const c = cacheContactos.find(x=>String(x.id)===String(id));
+  if(!c) return;
+  document.getElementById('c-id').value = c.id;
+  document.getElementById('c-nombre').value = c.nombre;
+  document.getElementById('c-email').value = c.email;
+  document.getElementById('c-torre').value = c.torre;
+  document.getElementById('c-tipo').value = c.tipo;
+  document.getElementById('form-contacto-titulo').textContent = 'Editar contacto';
+  document.getElementById('form-contacto').style.display = 'block';
+  document.getElementById('form-contacto').scrollIntoView({behavior:'smooth'});
+}
+async function eliminarContacto(id){
+  if(!confirm('¿Eliminar este contacto?')) return;
+  await api('deleteContacto', { id });
+  await cargarTodo();
+}
+async function guardarContacto(){
+  const id = document.getElementById('c-id').value;
   const payload = {
     nombre: document.getElementById('c-nombre').value,
     email: document.getElementById('c-email').value,
@@ -375,8 +423,11 @@ async function crearContacto(){
     etiquetas: '', activo: 'si'
   };
   if(!payload.nombre || !payload.email) return alert('Nombre y email son obligatorios');
-  await api('addContacto', payload);
+  if (id){ payload.id = id; await api('updateContacto', payload); }
+  else { await api('addContacto', payload); }
+  document.getElementById('c-id').value='';
   document.getElementById('c-nombre').value=''; document.getElementById('c-email').value='';
+  document.getElementById('form-contacto-titulo').textContent = 'Nuevo contacto — residente';
   await cargarTodo();
   toggleForm('form-contacto');
 }
@@ -387,9 +438,29 @@ function renderExternos(){
   if (!cacheExternos.length){ cont.innerHTML = '<p class="empty">Sin contactos externos aún.</p>'; return; }
   cont.innerHTML = '<table><tr><th>Nombre</th><th>Organización</th><th>Cargo</th><th>Email</th><th></th></tr>' +
     cacheExternos.map(c=>`<tr><td>${esc(c.nombre)}</td><td>${esc(c.organizacion)}</td><td>${esc(c.cargo)}</td>
-    <td class="mono">${esc(c.email)}</td><td><button class="icon-btn" onclick="abrirEnvioIndividual(${c.id}, true)">Enviar ✉</button></td></tr>`).join('') + '</table>';
+    <td class="mono">${esc(c.email)}</td><td>
+      <button class="icon-btn" onclick="abrirEnvioIndividual(${c.id}, true)">Enviar ✉</button>
+      <button class="icon-btn" onclick="editarExterno(${c.id})">Editar</button>
+      <button class="icon-btn" onclick="eliminarExterno(${c.id})">Eliminar</button>
+    </td></tr>`).join('') + '</table>';
+}
+function editarExterno(id){
+  const c = cacheExternos.find(x=>String(x.id)===String(id));
+  if(!c) return;
+  document.getElementById('ce-id').value = c.id;
+  document.getElementById('ce-nombre').value = c.nombre;
+  document.getElementById('ce-org').value = c.organizacion;
+  document.getElementById('ce-cargo').value = c.cargo;
+  document.getElementById('ce-email').value = c.email;
+  document.getElementById('form-externo').style.display = 'block';
+}
+async function eliminarExterno(id){
+  if(!confirm('¿Eliminar este contacto externo?')) return;
+  await api('deleteContactoExterno', { id });
+  await cargarTodo();
 }
 async function crearExterno(){
+  const id = document.getElementById('ce-id').value;
   const payload = {
     nombre: document.getElementById('ce-nombre').value,
     organizacion: document.getElementById('ce-org').value,
@@ -398,7 +469,9 @@ async function crearExterno(){
     notas: ''
   };
   if(!payload.nombre || !payload.email) return alert('Nombre y email son obligatorios');
-  await api('addContactoExterno', payload);
+  if (id){ payload.id = id; await api('updateContactoExterno', payload); }
+  else { await api('addContactoExterno', payload); }
+  document.getElementById('ce-id').value='';
   await cargarTodo();
   toggleForm('form-externo');
 }
@@ -423,8 +496,26 @@ async function abrirEnvioIndividual(contactoId, esExterno){
 function renderPlantillas(){
   const cont = document.getElementById('tabla-plantillas');
   if (!cachePlantillas.length){ cont.innerHTML = '<p class="empty">Sin plantillas aún. Crea la primera arriba.</p>'; return; }
-  cont.innerHTML = '<table><tr><th>Nombre</th><th>Asunto</th></tr>' +
-    cachePlantillas.map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.asunto)}</td></tr>`).join('') + '</table>';
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Asunto</th><th></th></tr>' +
+    cachePlantillas.map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.asunto)}</td><td>
+      <button class="icon-btn" onclick="editarPlantilla(${p.id})">Editar</button>
+      <button class="icon-btn" onclick="eliminarPlantilla(${p.id})">Eliminar</button>
+    </td></tr>`).join('') + '</table>';
+}
+function editarPlantilla(id){
+  const p = cachePlantillas.find(x=>String(x.id)===String(id));
+  if(!p) return;
+  document.getElementById('p-id').value = p.id;
+  document.getElementById('p-nombre').value = p.nombre;
+  document.getElementById('p-asunto').value = p.asunto;
+  document.getElementById('p-cuerpo').value = p.cuerpoHtml;
+  document.getElementById('form-plantilla').style.display = 'block';
+  document.getElementById('form-plantilla').scrollIntoView({behavior:'smooth'});
+}
+async function eliminarPlantilla(id){
+  if(!confirm('¿Eliminar esta plantilla?')) return;
+  await api('deletePlantilla', { id });
+  await cargarTodo();
 }
 function renderSelectPlantillas(){
   const sel = document.getElementById('cam-plantilla');
@@ -432,7 +523,8 @@ function renderSelectPlantillas(){
     ? cachePlantillas.map(p=>`<option value="${p.id}">${esc(p.nombre)}</option>`).join('')
     : '<option value="">Crea una plantilla primero</option>';
 }
-async function crearPlantilla(){
+async function guardarPlantilla(){
+  const id = document.getElementById('p-id').value;
   const payload = {
     nombre: document.getElementById('p-nombre').value,
     asunto: document.getElementById('p-asunto').value,
@@ -440,9 +532,36 @@ async function crearPlantilla(){
     adjuntoUrl: ''
   };
   if(!payload.nombre || !payload.asunto || !payload.cuerpoHtml) return alert('Completa nombre, asunto y cuerpo');
-  await api('addPlantilla', payload);
+  if (id){ payload.id = id; await api('updatePlantilla', payload); }
+  else { await api('addPlantilla', payload); }
+  document.getElementById('p-id').value='';
   await cargarTodo();
   toggleForm('form-plantilla');
+}
+
+// ========= CONFIGURACIÓN (logo / firma) =========
+function renderConfig(){
+  document.getElementById('cfg-logo').value = cacheConfig.logoUrl || '';
+  document.getElementById('cfg-firma').value = cacheConfig.firmaHtml || '';
+  document.getElementById('cfg-firma-preview').innerHTML = cacheConfig.firmaHtml || '<span class="empty">Sin firma configurada</span>';
+
+  const logoImg = document.getElementById('sidebar-logo');
+  const previewImg = document.getElementById('cfg-logo-preview');
+  if (cacheConfig.logoUrl){
+    logoImg.src = cacheConfig.logoUrl; logoImg.style.display = 'block';
+    previewImg.src = cacheConfig.logoUrl; previewImg.style.display = 'block';
+  }
+}
+async function guardarConfig(){
+  const payload = {
+    logoUrl: document.getElementById('cfg-logo').value,
+    firmaHtml: document.getElementById('cfg-firma').value
+  };
+  cacheConfig = await api('setConfig', payload);
+  renderConfig();
+  const msg = document.getElementById('cfg-msg');
+  msg.style.display='inline-block'; msg.textContent='✔ Guardado';
+  setTimeout(()=>{ msg.style.display='none'; }, 3000);
 }
 
 // ========= CAMPAÑAS =========
