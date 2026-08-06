@@ -133,8 +133,13 @@
     <section class="view" id="view-contactos">
       <div class="topline">
         <div><h2>Contactos</h2><p>Base de residentes y contactos externos</p></div>
-        <button class="icon-btn" onclick="toggleForm('form-contacto')">＋ Nuevo contacto</button>
+        <div>
+          <button class="icon-btn" onclick="document.getElementById('csv-input').click()">＋ Importar CSV</button>
+          <input type="file" id="csv-input" accept=".csv" style="display:none;" onchange="importarCSV(event)">
+          <button class="icon-btn" onclick="toggleForm('form-contacto')">＋ Nuevo contacto</button>
+        </div>
       </div>
+      <p class="empty" style="margin-top:-10px;">El CSV debe tener columnas: <span class="mono">nombre,email,torre,tipo</span> (tipo: propietario o arrendatario). Primera fila = encabezados.</p>
 
       <div class="card" id="form-contacto" style="display:none;">
         <h3 id="form-contacto-titulo">Nuevo contacto — residente</h3>
@@ -186,6 +191,9 @@
         <div class="form-row"><label>Nombre</label><input type="text" id="p-nombre"></div>
         <div class="form-row"><label>Asunto</label><input type="text" id="p-asunto"></div>
         <div class="form-row"><label>Cuerpo HTML — usa {{nombre}}, {{torre}}, {{link_encuesta}}, {{logo}}, {{firma}}</label><textarea id="p-cuerpo"></textarea></div>
+        <div class="form-row"><label>URL de adjunto(s) — PDF o imagen, separadas por coma si son varias</label>
+          <input type="text" id="p-adjunto" placeholder="https://tuusuario.github.io/turepo/Reglamento.pdf">
+        </div>
         <button class="btn-primary" onclick="guardarPlantilla()">Guardar plantilla</button>
       </div>
       <div class="card"><div id="tabla-plantillas"><p class="empty">Cargando...</p></div></div>
@@ -201,6 +209,7 @@
           <div class="type-toggle">
             <div class="opt sel" data-tipo="comunicado">Comunicado</div>
             <div class="opt" data-tipo="encuesta">Encuesta / Consulta</div>
+            <div class="opt" data-tipo="actualizacion">Actualización de datos</div>
           </div>
         </div>
         <div class="form-row"><label>Plantilla</label><select id="cam-plantilla"><option value="">Cargando...</option></select></div>
@@ -282,7 +291,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {};
@@ -476,6 +485,62 @@ async function crearExterno(){
   toggleForm('form-externo');
 }
 
+// detecta variables tipo {{FECHA}} en una plantilla que no sean las automáticas
+const VARIABLES_RESERVADAS = ['nombre','torre','logo','firma','link_encuesta','link_actualizacion','email','tipo','id','etiquetas','activo'];
+function detectarVariablesLibres(html){
+  const encontradas = new Set();
+  const regex = /{{\s*([a-zA-Z0-9_]+)\s*}}/g;
+  let m;
+  while ((m = regex.exec(html)) !== null){
+    if (!VARIABLES_RESERVADAS.includes(m[1])) encontradas.add(m[1]);
+  }
+  return Array.from(encontradas);
+}
+function pedirVariables(libres){
+  const variables = {};
+  for (const v of libres){
+    const val = prompt('Valor para "' + v + '":');
+    if (val === null) return null; // canceló
+    variables[v] = val;
+  }
+  return variables;
+}
+
+// ========= IMPORTAR CSV =========
+function parseCSV(texto){
+  const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+  if (!lineas.length) return [];
+  const headers = lineas[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g,''));
+  return lineas.slice(1).map(linea => {
+    const valores = linea.split(',').map(v => v.trim().replace(/^"|"$/g,''));
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = valores[i] || '');
+    return obj;
+  });
+}
+async function importarCSV(evento){
+  const file = evento.target.files[0];
+  if (!file) return;
+  const texto = await file.text();
+  const filas = parseCSV(texto);
+  const contactos = filas.map(f => ({
+    nombre: f.nombre || f.Nombre || '',
+    email: f.email || f.Email || f.correo || '',
+    torre: (f.torre || f.Torre || '').toUpperCase(),
+    tipo: (f.tipo || f.Tipo || 'propietario').toLowerCase()
+  })).filter(c => c.nombre && c.email);
+
+  if (!contactos.length) return alert('No se encontraron filas válidas (revisa que tenga columnas nombre y email).');
+  if (!confirm(`Se importarán ${contactos.length} contactos. ¿Continuar?`)) return;
+
+  try{
+    const r = await api('addContactosBulk', { contactos });
+    alert(`✔ Importados: ${r.agregados} de ${r.total}`);
+    await cargarTodo();
+  }catch(e){ /* error ya mostrado */ }
+  evento.target.value = '';
+}
+
 // ========= ENVÍO INDIVIDUAL =========
 async function abrirEnvioIndividual(contactoId, esExterno){
   if (!cachePlantillas.length) return alert('Primero crea al menos una plantilla.');
@@ -484,9 +549,13 @@ async function abrirEnvioIndividual(contactoId, esExterno){
   if (!idx) return;
   const plantilla = cachePlantillas[parseInt(idx,10)-1];
   if (!plantilla) return alert('Opción inválida');
-  const btnTxt = 'Enviando...';
+
+  const libres = detectarVariablesLibres(plantilla.cuerpoHtml + ' ' + plantilla.asunto);
+  const variables = libres.length ? pedirVariables(libres) : {};
+  if (variables === null) return; // canceló
+
   try{
-    const resultado = await api('enviarIndividual', { contactoId, esExterno, plantillaId: plantilla.id });
+    const resultado = await api('enviarIndividual', { contactoId, esExterno, plantillaId: plantilla.id, variables });
     alert(resultado.success ? '✔ Enviado correctamente.' : '✘ Error: ' + resultado.error);
     await cargarTodo();
   }catch(e){ /* error ya mostrado */ }
@@ -496,8 +565,8 @@ async function abrirEnvioIndividual(contactoId, esExterno){
 function renderPlantillas(){
   const cont = document.getElementById('tabla-plantillas');
   if (!cachePlantillas.length){ cont.innerHTML = '<p class="empty">Sin plantillas aún. Crea la primera arriba.</p>'; return; }
-  cont.innerHTML = '<table><tr><th>Nombre</th><th>Asunto</th><th></th></tr>' +
-    cachePlantillas.map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.asunto)}</td><td>
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Asunto</th><th>Adjunto</th><th></th></tr>' +
+    cachePlantillas.map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.asunto)}</td><td>${p.adjuntoUrl ? '📎 sí' : '—'}</td><td>
       <button class="icon-btn" onclick="editarPlantilla(${p.id})">Editar</button>
       <button class="icon-btn" onclick="eliminarPlantilla(${p.id})">Eliminar</button>
     </td></tr>`).join('') + '</table>';
@@ -509,6 +578,7 @@ function editarPlantilla(id){
   document.getElementById('p-nombre').value = p.nombre;
   document.getElementById('p-asunto').value = p.asunto;
   document.getElementById('p-cuerpo').value = p.cuerpoHtml;
+  document.getElementById('p-adjunto').value = p.adjuntoUrl || '';
   document.getElementById('form-plantilla').style.display = 'block';
   document.getElementById('form-plantilla').scrollIntoView({behavior:'smooth'});
 }
@@ -529,12 +599,13 @@ async function guardarPlantilla(){
     nombre: document.getElementById('p-nombre').value,
     asunto: document.getElementById('p-asunto').value,
     cuerpoHtml: document.getElementById('p-cuerpo').value,
-    adjuntoUrl: ''
+    adjuntoUrl: document.getElementById('p-adjunto').value
   };
   if(!payload.nombre || !payload.asunto || !payload.cuerpoHtml) return alert('Completa nombre, asunto y cuerpo');
   if (id){ payload.id = id; await api('updatePlantilla', payload); }
   else { await api('addPlantilla', payload); }
   document.getElementById('p-id').value='';
+  document.getElementById('p-adjunto').value='';
   await cargarTodo();
   toggleForm('form-plantilla');
 }
@@ -581,6 +652,11 @@ async function crearCampana(){
   const plantillaId = document.getElementById('cam-plantilla').value;
   if(!nombre || !plantillaId) return alert('Falta nombre o plantilla');
 
+  const plantilla = cachePlantillas.find(p=>String(p.id)===String(plantillaId));
+  const libres = plantilla ? detectarVariablesLibres(plantilla.cuerpoHtml + ' ' + plantilla.asunto) : [];
+  const variables = libres.length ? pedirVariables(libres) : {};
+  if (variables === null) return; // canceló
+
   const torres = Array.from(document.querySelectorAll('#cam-torres input:checked')).map(i=>i.value);
   const tipos = Array.from(document.querySelectorAll('#cam-tipos input:checked')).map(i=>i.value);
   const externos = document.getElementById('cam-externos').checked;
@@ -591,7 +667,8 @@ async function crearCampana(){
     nombre, tipo: campanaTipoSeleccionado, plantillaId, segmento,
     fechaProgramada: fecha ? fecha.replace('T',' ') : '',
     estado: fecha ? 'programada' : 'borrador',
-    escalonado: 'no'
+    escalonado: 'no',
+    variables: JSON.stringify(variables)
   };
   await api('addCampana', payload);
   const msg = document.getElementById('cam-msg');
