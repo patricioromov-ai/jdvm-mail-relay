@@ -371,7 +371,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
@@ -615,7 +615,9 @@ async function importarCSV(evento){
     nombre: f.nombre || f.Nombre || '',
     email: f.email || f.Email || f.correo || '',
     torre: (f.torre || f.Torre || '').toUpperCase(),
-    tipo: (f.tipo || f.Tipo || 'propietario').toLowerCase()
+    tipo: (f.tipo || f.Tipo || 'propietario').toLowerCase(),
+    telefono: f.telefono || f.Telefono || f['Teléfono'] || '',
+    unidad: f.unidad || f.Unidad || ''
   })).filter(c => c.nombre && c.email);
 
   if (!contactos.length) return alert('No se encontraron filas válidas (revisa que tenga columnas nombre y email).');
@@ -661,12 +663,21 @@ function nuevaPlantillaForm(){
   document.getElementById('form-plantilla').style.display = 'block';
 }
 
+function parseAdjuntosGuardados(campo){
+  if (!campo) return [];
+  try{
+    const parsed = JSON.parse(campo);
+    if (Array.isArray(parsed)) return parsed;
+  }catch(e){ /* formato antiguo: URLs separadas por coma */ }
+  return campo.split(',').map(u=>u.trim()).filter(Boolean)
+    .map(u=>({ nombre: decodeURIComponent(u.split('/').pop().split('?')[0]) || u, url: u }));
+}
 function renderAdjuntosLista(){
   const cont = document.getElementById('p-adjuntos-lista');
   cont.innerHTML = adjuntosActuales.length
     ? adjuntosActuales.map((a,i)=>`<span class="tag" style="display:inline-flex;align-items:center;gap:6px;margin:2px 4px 2px 0;">📎 ${esc(a.nombre)} <button class="icon-btn" style="padding:1px 7px;" onclick="quitarAdjunto(${i})">×</button></span>`).join('')
     : '<p class="empty">Sin adjuntos.</p>';
-  document.getElementById('p-adjunto').value = adjuntosActuales.map(a=>a.url).join(',');
+  document.getElementById('p-adjunto').value = adjuntosActuales.length ? JSON.stringify(adjuntosActuales) : '';
 }
 function quitarAdjunto(i){ adjuntosActuales.splice(i,1); renderAdjuntosLista(); }
 function fileToBase64(file){
@@ -709,8 +720,7 @@ function editarPlantilla(id){
   document.getElementById('p-nombre').value = p.nombre;
   document.getElementById('p-asunto').value = p.asunto;
   document.getElementById('p-cuerpo').value = p.cuerpoHtml;
-  adjuntosActuales = (p.adjuntoUrl || '').split(',').map(u=>u.trim()).filter(Boolean)
-    .map(u=>({ nombre: decodeURIComponent(u.split('/').pop().split('?')[0]) || u, url: u }));
+  adjuntosActuales = parseAdjuntosGuardados(p.adjuntoUrl);
   renderAdjuntosLista();
   document.getElementById('form-plantilla').style.display = 'block';
   document.getElementById('form-plantilla').scrollIntoView({behavior:'smooth'});
