@@ -375,7 +375,7 @@ const CONFIG = {
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
 let campanaTipoSeleccionado = 'comunicado';
 
-if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
+if (CONFIG.API_SECRET === 'comunicacion_jdvm') {
   const banner = document.getElementById('config-banner');
   banner.style.display = 'block';
   banner.textContent = '⚠ Falta configurar API_SECRET en el código (línea CONFIG, arriba). Edita el archivo y reemplaza PON_AQUI_TU_API_SECRET por la clave que definiste en Apps Script.';
