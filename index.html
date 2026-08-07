@@ -53,6 +53,8 @@
   .badge.enviada{background:#E4EEE9;color:var(--torre-b);}
   .badge.programada{background:#F2E8DA;color:var(--torre-c);}
   .badge.borrador{background:#EAEAE4;color:var(--pending);}
+  .badge.enviando{background:#F2E8DA;color:var(--torre-c);}
+  .badge.actualizacion{background:#E4EEE9;color:var(--torre-b);}
   .icon-btn{background:none;border:1px solid var(--line);border-radius:5px;padding:5px 9px;cursor:pointer;font-size:0.8rem;color:var(--ink-soft);}
   .icon-btn:hover{border-color:var(--ink-soft);color:var(--ink);}
   .icon-btn:disabled{opacity:0.5;cursor:default;}
@@ -207,16 +209,16 @@
 
     <!-- CAMPAÑAS -->
     <section class="view" id="view-campanas">
-      <div class="topline"><div><h2>Nueva campaña</h2><p>Comunicado directo o encuesta con respuestas</p></div></div>
+      <div class="topline"><div><h2>Nueva campaña</h2><p>Comunicado directo o actualización de datos</p></div></div>
       <div class="card">
         <div class="form-row"><label>Nombre de la campaña</label><input type="text" id="cam-nombre"></div>
         <div class="form-row">
           <label>Tipo de campaña</label>
           <div class="type-toggle">
             <div class="opt sel" data-tipo="comunicado">Comunicado</div>
-            <div class="opt" data-tipo="encuesta">Encuesta / Consulta</div>
             <div class="opt" data-tipo="actualizacion">Actualización de datos</div>
           </div>
+          <p class="empty" style="margin-top:8px;">¿Necesitas una encuesta? Se crean directo en la pestaña <b>Encuestas</b>.</p>
         </div>
         <div class="form-row"><label>Plantilla</label><select id="cam-plantilla"><option value="">Cargando...</option></select></div>
         <div class="form-row">
@@ -239,6 +241,14 @@
           <label>Incluir también</label>
           <div class="check-group"><label><input type="checkbox" id="cam-externos"> Contactos externos (autoridades/organizaciones)</label></div>
         </div>
+        <div class="form-row">
+          <label>Envío escalonado <span style="font-weight:400;color:var(--pending);">(recomendado con más de ~50 destinatarios, evita filtros de spam)</span></label>
+          <div class="check-group"><label><input type="checkbox" id="cam-escalonado-activo" onchange="document.getElementById('cam-escalonado-tanda-row').style.display=this.checked?'block':'none';"> Activar</label></div>
+          <div id="cam-escalonado-tanda-row" style="display:none;margin-top:8px;">
+            <input type="text" id="cam-escalonado-tanda" placeholder="Tamaño de tanda, ej. 30" style="max-width:220px;">
+            <p class="empty" style="margin-top:6px;">Se envía una tanda cada vez que corre la revisión automática (~cada 10 minutos), hasta completar todos los destinatarios.</p>
+          </div>
+        </div>
         <div class="form-row"><label>Programar envío (vacío = queda en borrador)</label><input type="datetime-local" id="cam-fecha"></div>
         <button class="btn-primary" onclick="crearCampana()">Guardar campaña</button>
         <span id="cam-msg" class="tag" style="margin-left:10px;display:none;"></span>
@@ -248,13 +258,46 @@
         <h3>Campañas existentes</h3>
         <div id="tabla-campanas"><p class="empty">Cargando...</p></div>
       </div>
+
+      <div class="card" id="campana-comprobante" style="display:none;"></div>
     </section>
 
     <!-- ENCUESTAS -->
     <section class="view" id="view-encuestas">
-      <div class="topline"><div><h2>Encuestas</h2><p>Crea las preguntas y revisa resultados por campaña</p></div></div>
+      <div class="topline">
+        <div><h2>Encuestas</h2><p>Crea la encuesta, sus preguntas, y revisa resultados — todo en un solo lugar</p></div>
+        <button class="icon-btn" onclick="toggleForm('form-nueva-encuesta')">＋ Nueva encuesta</button>
+      </div>
+
+      <div class="card" id="form-nueva-encuesta" style="display:none;">
+        <h3>Nueva encuesta</h3>
+        <div class="form-row"><label>Nombre de la encuesta</label><input type="text" id="ne-nombre"></div>
+        <div class="form-row"><label>Plantilla — debe tener <span class="mono">{{link_encuesta}}</span> en el cuerpo</label>
+          <select id="ne-plantilla"><option value="">Cargando...</option></select>
+        </div>
+        <div class="form-row">
+          <label>Segmento — Residentes</label>
+          <div class="check-group" id="ne-torres">
+            <label><input type="checkbox" value="A" checked><span class="torre-tab a"></span>Torre A</label>
+            <label><input type="checkbox" value="B" checked><span class="torre-tab b"></span>Torre B</label>
+            <label><input type="checkbox" value="C" checked><span class="torre-tab c"></span>Torre C</label>
+            <label><input type="checkbox" value="D" checked><span class="torre-tab d"></span>Torre D</label>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Filtrar por tipo (deja ambos sin marcar para incluir todos)</label>
+          <div class="check-group" id="ne-tipos">
+            <label><input type="checkbox" value="propietario"> Solo propietarios</label>
+            <label><input type="checkbox" value="arrendatario"> Solo arrendatarios</label>
+          </div>
+        </div>
+        <div class="form-row"><div class="check-group"><label><input type="checkbox" id="ne-externos"> Incluir contactos externos</label></div></div>
+        <button class="btn-primary" onclick="crearEncuestaCampana()">Crear encuesta</button>
+        <p class="empty" style="margin-top:8px;">Queda en borrador. Agrega las preguntas abajo antes de enviarla desde "Campañas".</p>
+      </div>
+
       <div class="card">
-        <div class="form-row"><label>Campaña (debe ser tipo "Encuesta / Consulta", creada en la pestaña Campañas)</label>
+        <div class="form-row"><label>Seleccionar encuesta existente</label>
           <select id="enc-select" onchange="cambiarCampanaEncuesta()"><option value="">Selecciona...</option></select>
         </div>
       </div>
@@ -266,7 +309,8 @@
         </div>
 
         <div class="card">
-          <h3>Agregar pregunta</h3>
+          <h3 id="enc-form-titulo">Agregar pregunta</h3>
+          <input type="hidden" id="enc-id">
           <div class="form-row"><label>Pregunta</label><input type="text" id="enc-pregunta"></div>
           <div class="form-row"><label>Tipo de respuesta</label>
             <select id="enc-tipo" onchange="document.getElementById('enc-opciones-row').style.display = this.value==='opcion_multiple' ? 'block':'none';">
@@ -277,7 +321,7 @@
           </div>
           <div class="form-row" id="enc-opciones-row"><label>Opciones (separadas por coma)</label><input type="text" id="enc-opciones" placeholder="Sí, No, Me da lo mismo"></div>
           <div class="form-row"><div class="check-group"><label><input type="checkbox" id="enc-identificada"> Encuesta identificada (sabrás quién respondió)</label></div></div>
-          <button class="btn-primary" onclick="agregarPregunta()">Agregar pregunta</button>
+          <button class="btn-primary" onclick="guardarPregunta()">Guardar pregunta</button>
         </div>
 
         <div class="card">
@@ -325,7 +369,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
@@ -683,10 +727,12 @@ function renderCampanas(){
   if (!cacheCampanas.length){ cont.innerHTML = '<p class="empty">Sin campañas aún.</p>'; return; }
   cont.innerHTML = '<table><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th><th></th></tr>' +
     cacheCampanas.map(c=>{
-      const btn = c.estado==='borrador' || c.estado==='programada'
-        ? `<button class="icon-btn" onclick="enviarCampanaAhora(${c.id})">Enviar ahora</button>` : '—';
+      const puedeEnviar = c.estado==='borrador' || c.estado==='programada' || c.estado==='enviando';
+      const label = c.estado==='enviando' ? 'Continuar envío' : 'Enviar ahora';
+      const btnEnviar = puedeEnviar ? `<button class="icon-btn" onclick="enviarCampanaAhora(${c.id})">${label}</button>` : '';
+      const btnComprobante = `<button class="icon-btn" onclick="verComprobante(${c.id})">Ver comprobante</button>`;
       return `<tr><td>${esc(c.nombre)}</td><td><span class="badge ${c.tipo}">${c.tipo}</span></td>
-      <td><span class="badge ${c.estado}">${c.estado}</span></td><td class="mono">${esc(c.fechaProgramada)||'—'}</td><td>${btn}</td></tr>`;
+      <td><span class="badge ${c.estado}">${c.estado}</span></td><td class="mono">${esc(c.fechaProgramada)||'—'}</td><td>${btnEnviar} ${btnComprobante}</td></tr>`;
     }).join('') + '</table>';
 }
 async function crearCampana(){
@@ -703,14 +749,16 @@ async function crearCampana(){
   const tipos = Array.from(document.querySelectorAll('#cam-tipos input:checked')).map(i=>i.value);
   const externos = document.getElementById('cam-externos').checked;
   const fecha = document.getElementById('cam-fecha').value;
+  const escalonadoActivo = document.getElementById('cam-escalonado-activo').checked;
+  const tanda = parseInt(document.getElementById('cam-escalonado-tanda').value, 10) || 30;
 
   const segmento = JSON.stringify({ torres, tipos, externos });
   const payload = {
     nombre, tipo: campanaTipoSeleccionado, plantillaId, segmento,
     fechaProgramada: fecha ? fecha.replace('T',' ') : '',
     estado: fecha ? 'programada' : 'borrador',
-    escalonado: 'no',
-    variables: JSON.stringify(variables)
+    variables: JSON.stringify(variables),
+    escalonadoConfig: JSON.stringify({ activo: escalonadoActivo, tamano: tanda })
   };
   await api('addCampana', payload);
   const msg = document.getElementById('cam-msg');
@@ -719,12 +767,39 @@ async function crearCampana(){
   await cargarTodo();
 }
 async function enviarCampanaAhora(id){
-  if (!confirm('¿Enviar esta campaña ahora a todos los destinatarios del segmento?')) return;
+  if (!confirm('¿Enviar esta campaña ahora? Si tiene envío escalonado activo, se mandará solo la primera tanda.')) return;
   try{
     const r = await api('enviarCampanaAhora', { id });
-    alert(`Enviados: ${r.enviados} · Fallidos: ${r.fallidos}`);
+    let msg = `Enviados en esta tanda: ${r.enviados} · Fallidos: ${r.fallidos}`;
+    if (r.pendientes > 0) msg += `\nQuedan ${r.pendientes} pendientes — se enviarán automáticamente en las próximas tandas (revisión cada ~10 min).`;
+    alert(msg);
     await cargarTodo();
   }catch(e){}
+}
+
+// ========= COMPROBANTE =========
+function nombreContactoPorId(id){
+  const c = cacheContactos.find(x=>String(x.id)===String(id)) || cacheExternos.find(x=>String(x.id)===String(id));
+  return c ? `${c.nombre} (${c.email})` : 'Individual / contacto #' + id;
+}
+function verComprobante(campanaId){
+  const campana = cacheCampanas.find(c=>String(c.id)===String(campanaId));
+  const logs = cacheLogs.filter(l=>String(l.campanaId)===String(campanaId) && l.tipo==='envio');
+  const cont = document.getElementById('campana-comprobante');
+  cont.style.display = 'block';
+  if (!logs.length){ cont.innerHTML = '<p class="empty">Sin registros de envío para esta campaña todavía.</p>'; cont.scrollIntoView({behavior:'smooth'}); return; }
+  cont.innerHTML = `<h3>Comprobante — ${esc(campana ? campana.nombre : '')}</h3>` +
+    '<table><tr><th>Destinatario</th><th>Fecha</th><th>Estado</th><th></th></tr>' +
+    logs.map(l => `<tr><td>${esc(nombreContactoPorId(l.contactoId))}</td><td class="mono">${esc(l.fecha)}</td>
+    <td><span class="badge ${l.estado==='entregado'?'enviada':'borrador'}">${esc(l.estado)}</span></td>
+    <td><button class="icon-btn" onclick='abrirCorreoEnviado(${JSON.stringify(l.cuerpoEnviado||'(sin copia guardada)')})'>Ver correo exacto</button></td></tr>`).join('') +
+    '</table>';
+  cont.scrollIntoView({behavior:'smooth'});
+}
+function abrirCorreoEnviado(html){
+  const blob = new Blob([html], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
 }
 
 // ========= ENCUESTAS =========
@@ -733,14 +808,43 @@ function renderSelectEncuestas(){
   const valorActual = sel.value;
   const encuestas = cacheCampanas.filter(c=>c.tipo==='encuesta');
   sel.innerHTML = '<option value="">Selecciona...</option>' +
-    encuestas.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+    encuestas.map(c=>`<option value="${c.id}">${esc(c.nombre)} — ${esc(c.estado)}</option>`).join('');
   if (valorActual) { sel.value = valorActual; cambiarCampanaEncuesta(); }
+
+  const selPlantilla = document.getElementById('ne-plantilla');
+  if (selPlantilla){
+    selPlantilla.innerHTML = cachePlantillas.length
+      ? cachePlantillas.map(p=>`<option value="${p.id}">${esc(p.nombre)}</option>`).join('')
+      : '<option value="">Crea una plantilla primero</option>';
+  }
+}
+async function crearEncuestaCampana(){
+  const nombre = document.getElementById('ne-nombre').value;
+  const plantillaId = document.getElementById('ne-plantilla').value;
+  if (!nombre || !plantillaId) return alert('Falta nombre o plantilla');
+
+  const torres = Array.from(document.querySelectorAll('#ne-torres input:checked')).map(i=>i.value);
+  const tipos = Array.from(document.querySelectorAll('#ne-tipos input:checked')).map(i=>i.value);
+  const externos = document.getElementById('ne-externos').checked;
+  const segmento = JSON.stringify({ torres, tipos, externos });
+
+  const nueva = await api('addCampana', {
+    nombre, tipo: 'encuesta', plantillaId, segmento,
+    fechaProgramada: '', estado: 'borrador',
+    variables: '{}', escalonadoConfig: JSON.stringify({ activo:false })
+  });
+  document.getElementById('ne-nombre').value = '';
+  toggleForm('form-nueva-encuesta');
+  await cargarTodo();
+  document.getElementById('enc-select').value = nueva.id;
+  cambiarCampanaEncuesta();
 }
 function cambiarCampanaEncuesta(){
   const id = document.getElementById('enc-select').value;
   const gestion = document.getElementById('enc-gestion');
   if (!id){ gestion.style.display = 'none'; return; }
   gestion.style.display = 'block';
+  cancelarEdicionPregunta();
   renderPreguntasEncuesta(id);
   cargarResultadosEncuesta(id);
 }
@@ -751,9 +855,29 @@ function renderPreguntasEncuesta(campanaId){
   cont.innerHTML = '<table><tr><th>Pregunta</th><th>Tipo</th><th>Opciones</th><th>¿Identificada?</th><th></th></tr>' +
     preguntas.map(p=>`<tr><td>${esc(p.pregunta)}</td><td class="mono">${esc(p.tipoPregunta)}</td>
     <td class="mono">${esc(p.opciones)||'—'}</td><td>${p.identificada==='si'||p.identificada===true?'Sí':'No'}</td>
-    <td><button class="icon-btn" onclick="eliminarPregunta(${p.id})">Eliminar</button></td></tr>`).join('') + '</table>';
+    <td><button class="icon-btn" onclick="editarPregunta(${p.id})">Editar</button>
+    <button class="icon-btn" onclick="eliminarPregunta(${p.id})">Eliminar</button></td></tr>`).join('') + '</table>';
 }
-async function agregarPregunta(){
+function editarPregunta(id){
+  const p = cacheEncuestas.find(x=>String(x.id)===String(id));
+  if (!p) return;
+  document.getElementById('enc-id').value = p.id;
+  document.getElementById('enc-pregunta').value = p.pregunta;
+  document.getElementById('enc-tipo').value = p.tipoPregunta;
+  document.getElementById('enc-opciones').value = p.opciones || '';
+  document.getElementById('enc-opciones-row').style.display = p.tipoPregunta === 'opcion_multiple' ? 'block' : 'none';
+  document.getElementById('enc-identificada').checked = (p.identificada === 'si' || p.identificada === true);
+  document.getElementById('enc-form-titulo').textContent = 'Editar pregunta';
+}
+function cancelarEdicionPregunta(){
+  document.getElementById('enc-id').value = '';
+  document.getElementById('enc-pregunta').value = '';
+  document.getElementById('enc-opciones').value = '';
+  document.getElementById('enc-identificada').checked = false;
+  document.getElementById('enc-form-titulo').textContent = 'Agregar pregunta';
+}
+async function guardarPregunta(){
+  const id = document.getElementById('enc-id').value;
   const campanaId = document.getElementById('enc-select').value;
   const pregunta = document.getElementById('enc-pregunta').value;
   const tipoPregunta = document.getElementById('enc-tipo').value;
@@ -762,9 +886,10 @@ async function agregarPregunta(){
   if (!pregunta) return alert('Escribe la pregunta');
   if (tipoPregunta === 'opcion_multiple' && !opciones) return alert('Agrega las opciones separadas por coma');
 
-  await api('addEncuesta', { campanaId, pregunta, tipoPregunta, opciones, identificada });
-  document.getElementById('enc-pregunta').value = '';
-  document.getElementById('enc-opciones').value = '';
+  if (id) await api('updateEncuesta', { id, campanaId, pregunta, tipoPregunta, opciones, identificada });
+  else await api('addEncuesta', { campanaId, pregunta, tipoPregunta, opciones, identificada });
+
+  cancelarEdicionPregunta();
   cacheEncuestas = await api('listEncuestas');
   renderPreguntasEncuesta(campanaId);
 }
