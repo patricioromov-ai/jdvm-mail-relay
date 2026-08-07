@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  const { apiKey, to, subject, html, attachments } = req.body;
+  const { apiKey, to, subject, html, text, attachments } = req.body;
 
   if (apiKey !== process.env.API_SECRET) {
     return res.status(401).json({ error: 'No autorizado' });
@@ -38,6 +38,7 @@ module.exports = async (req, res) => {
       subject,
       html,
     };
+    if (text) mailOptions.text = text;
     // attachments: [{ filename: 'Reglamento.pdf', path: 'https://.../Reglamento.pdf' }]
     // nodemailer descarga el archivo directo desde la URL pública indicada en "path"
     if (Array.isArray(attachments) && attachments.length > 0) {
