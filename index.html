@@ -192,15 +192,17 @@
     <section class="view" id="view-plantillas">
       <div class="topline">
         <div><h2>Plantillas</h2><p>Reutilizables, con variables de personalización</p></div>
-        <button class="icon-btn" onclick="toggleForm('form-plantilla')">＋ Nueva plantilla</button>
+        <button class="icon-btn" onclick="nuevaPlantillaForm()">＋ Nueva plantilla</button>
       </div>
       <div class="card" id="form-plantilla" style="display:none;">
         <input type="hidden" id="p-id">
         <div class="form-row"><label>Nombre</label><input type="text" id="p-nombre"></div>
         <div class="form-row"><label>Asunto</label><input type="text" id="p-asunto"></div>
         <div class="form-row"><label>Cuerpo HTML — usa {{nombre}}, {{torre}}, {{link_encuesta}}, {{logo}}, {{firma}}</label><textarea id="p-cuerpo"></textarea></div>
-        <div class="form-row"><label>URL de adjunto(s) — PDF o imagen, separadas por coma si son varias</label>
-          <input type="text" id="p-adjunto" placeholder="https://tuusuario.github.io/turepo/Reglamento.pdf">
+        <div class="form-row"><label>Adjuntos — imagen o PDF (se suben y quedan guardados en tu Drive)</label>
+          <input type="file" id="p-adjunto-file" accept="image/*,application/pdf" multiple onchange="subirAdjuntos(event)">
+          <div id="p-adjuntos-lista" style="margin-top:10px;"></div>
+          <input type="hidden" id="p-adjunto">
         </div>
         <button class="btn-primary" onclick="guardarPlantilla()">Guardar plantilla</button>
       </div>
@@ -369,13 +371,13 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
 let campanaTipoSeleccionado = 'comunicado';
 
-if (CONFIG.API_SECRET === 'comunicacion_jdvm') {
+if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
   const banner = document.getElementById('config-banner');
   banner.style.display = 'block';
   banner.textContent = '⚠ Falta configurar API_SECRET en el código (línea CONFIG, arriba). Edita el archivo y reemplaza PON_AQUI_TU_API_SECRET por la clave que definiste en Apps Script.';
@@ -648,6 +650,49 @@ async function abrirEnvioIndividual(contactoId, esExterno){
 }
 
 // ========= PLANTILLAS =========
+let adjuntosActuales = []; // [{nombre, url}]
+function nuevaPlantillaForm(){
+  document.getElementById('p-id').value = '';
+  document.getElementById('p-nombre').value = '';
+  document.getElementById('p-asunto').value = '';
+  document.getElementById('p-cuerpo').value = '';
+  adjuntosActuales = [];
+  renderAdjuntosLista();
+  document.getElementById('form-plantilla').style.display = 'block';
+}
+
+function renderAdjuntosLista(){
+  const cont = document.getElementById('p-adjuntos-lista');
+  cont.innerHTML = adjuntosActuales.length
+    ? adjuntosActuales.map((a,i)=>`<span class="tag" style="display:inline-flex;align-items:center;gap:6px;margin:2px 4px 2px 0;">📎 ${esc(a.nombre)} <button class="icon-btn" style="padding:1px 7px;" onclick="quitarAdjunto(${i})">×</button></span>`).join('')
+    : '<p class="empty">Sin adjuntos.</p>';
+  document.getElementById('p-adjunto').value = adjuntosActuales.map(a=>a.url).join(',');
+}
+function quitarAdjunto(i){ adjuntosActuales.splice(i,1); renderAdjuntosLista(); }
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function subirAdjuntos(evento){
+  const files = Array.from(evento.target.files);
+  const cont = document.getElementById('p-adjuntos-lista');
+  for (const file of files){
+    if (file.size > 8*1024*1024){ alert(`"${file.name}" pesa demasiado (máx ~8MB por archivo).`); continue; }
+    cont.innerHTML = `<p class="empty">Subiendo "${esc(file.name)}"...</p>`;
+    try{
+      const base64 = await fileToBase64(file);
+      const r = await api('subirAdjunto', { nombreArchivo: file.name, contentType: file.type, base64Data: base64 });
+      adjuntosActuales.push({ nombre: file.name, url: r.url });
+    }catch(e){ /* error ya mostrado en el banner */ }
+  }
+  renderAdjuntosLista();
+  evento.target.value = '';
+}
+
 function renderPlantillas(){
   const cont = document.getElementById('tabla-plantillas');
   if (!cachePlantillas.length){ cont.innerHTML = '<p class="empty">Sin plantillas aún. Crea la primera arriba.</p>'; return; }
@@ -664,7 +709,9 @@ function editarPlantilla(id){
   document.getElementById('p-nombre').value = p.nombre;
   document.getElementById('p-asunto').value = p.asunto;
   document.getElementById('p-cuerpo').value = p.cuerpoHtml;
-  document.getElementById('p-adjunto').value = p.adjuntoUrl || '';
+  adjuntosActuales = (p.adjuntoUrl || '').split(',').map(u=>u.trim()).filter(Boolean)
+    .map(u=>({ nombre: decodeURIComponent(u.split('/').pop().split('?')[0]) || u, url: u }));
+  renderAdjuntosLista();
   document.getElementById('form-plantilla').style.display = 'block';
   document.getElementById('form-plantilla').scrollIntoView({behavior:'smooth'});
 }
@@ -691,7 +738,8 @@ async function guardarPlantilla(){
   if (id){ payload.id = id; await api('updatePlantilla', payload); }
   else { await api('addPlantilla', payload); }
   document.getElementById('p-id').value='';
-  document.getElementById('p-adjunto').value='';
+  adjuntosActuales = [];
+  renderAdjuntosLista();
   await cargarTodo();
   toggleForm('form-plantilla');
 }
