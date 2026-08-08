@@ -60,8 +60,8 @@
   .icon-btn:disabled{opacity:0.5;cursor:default;}
   .icon-btn:focus-visible,.nav-item:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--torre-c);outline-offset:2px;}
   .subtabs{display:flex;gap:6px;margin-bottom:16px;}
-  .subtab{padding:6px 14px;font-size:0.83rem;border-radius:5px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--ink-soft);}
-  .subtab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .subtab, .filtro-tab{padding:6px 14px;font-size:0.83rem;border-radius:5px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--ink-soft);}
+  .subtab.active, .filtro-tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
   .form-row{margin-bottom:16px;}
   .form-row label{display:block;font-size:0.8rem;font-weight:600;margin-bottom:6px;color:var(--ink-soft);}
   .form-row select,.form-row input[type=text],.form-row input[type=email],.form-row input[type=datetime-local],.form-row textarea{
@@ -176,9 +176,9 @@
           <input type="text" id="buscar-contactos" placeholder="Buscar por nombre, email, torre, unidad, teléfono..." oninput="renderContactos()">
         </div>
         <div class="subtabs" style="margin-bottom:14px;">
-          <div class="subtab active" data-filtro-tipo="" onclick="filtrarPorTipo('', this)">Todos</div>
-          <div class="subtab" data-filtro-tipo="propietario" onclick="filtrarPorTipo('propietario', this)">Propietarios</div>
-          <div class="subtab" data-filtro-tipo="arrendatario" onclick="filtrarPorTipo('arrendatario', this)">Arrendatarios</div>
+          <div class="filtro-tab active" data-filtro-tipo="" onclick="filtrarPorTipo('', this)">Todos</div>
+          <div class="filtro-tab" data-filtro-tipo="propietario" onclick="filtrarPorTipo('propietario', this)">Propietarios</div>
+          <div class="filtro-tab" data-filtro-tipo="arrendatario" onclick="filtrarPorTipo('arrendatario', this)">Arrendatarios</div>
         </div>
         <div id="tabla-contactos"><p class="empty">Cargando...</p></div>
       </div>
@@ -381,11 +381,11 @@
 <script>
 // ========= CONFIGURACIÓN =========
 // Pega aquí la URL de tu implementación de Apps Script (paso 4 de la guía)
-// y la clave  que tú definiste en las Propiedades del script.
+// y la clave API_SECRET que tú definiste en las Propiedades del script.
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
@@ -489,7 +489,7 @@ function renderPanel(){
 let filtroTipoActual = '';
 function filtrarPorTipo(tipo, elemento){
   filtroTipoActual = tipo;
-  document.querySelectorAll('#sub-residentes .subtab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#sub-residentes .filtro-tab').forEach(t=>t.classList.remove('active'));
   elemento.classList.add('active');
   renderContactos();
 }
