@@ -170,7 +170,17 @@
         <div class="subtab" data-sub="externos">Autoridades / Organizaciones</div>
       </div>
 
-      <div class="card" id="sub-residentes"><div id="tabla-contactos"><p class="empty">Cargando...</p></div></div>
+      <div class="card" id="sub-residentes">
+        <div class="form-row">
+          <input type="text" id="buscar-contactos" placeholder="Buscar por nombre, email, torre, unidad, teléfono..." oninput="renderContactos()">
+        </div>
+        <div class="subtabs" style="margin-bottom:14px;">
+          <div class="subtab active" data-filtro-tipo="" onclick="filtrarPorTipo('', this)">Todos</div>
+          <div class="subtab" data-filtro-tipo="propietario" onclick="filtrarPorTipo('propietario', this)">Propietarios</div>
+          <div class="subtab" data-filtro-tipo="arrendatario" onclick="filtrarPorTipo('arrendatario', this)">Arrendatarios</div>
+        </div>
+        <div id="tabla-contactos"><p class="empty">Cargando...</p></div>
+      </div>
 
       <div class="card" id="sub-externos" style="display:none;">
         <button class="icon-btn" style="margin-bottom:14px;" onclick="toggleForm('form-externo')">＋ Nuevo contacto externo</button>
@@ -183,6 +193,9 @@
             <div class="form-row"><label>Email</label><input type="email" id="ce-email"></div>
           </div>
           <button class="btn-primary" onclick="crearExterno()">Guardar</button>
+        </div>
+        <div class="form-row">
+          <input type="text" id="buscar-externos" placeholder="Buscar por nombre, organización, cargo, email..." oninput="renderExternos()">
         </div>
         <div id="tabla-externos"><p class="empty">Cargando...</p></div>
       </div>
@@ -371,7 +384,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
@@ -472,11 +485,29 @@ function renderPanel(){
 }
 
 // ========= CONTACTOS =========
+let filtroTipoActual = '';
+function filtrarPorTipo(tipo, elemento){
+  filtroTipoActual = tipo;
+  document.querySelectorAll('#sub-residentes .subtab').forEach(t=>t.classList.remove('active'));
+  elemento.classList.add('active');
+  renderContactos();
+}
 function renderContactos(){
   const cont = document.getElementById('tabla-contactos');
   if (!cacheContactos.length){ cont.innerHTML = '<p class="empty">Sin contactos aún. Agrega el primero arriba.</p>'; return; }
-  cont.innerHTML = '<table><tr><th>Nombre</th><th>Torre</th><th>Tipo</th><th>Email</th><th></th></tr>' +
-    cacheContactos.map(c=>`<tr><td>${esc(c.nombre)}</td><td><span class="torre-tab ${String(c.torre).toLowerCase()}"></span>${esc(c.torre)}</td>
+
+  const busqueda = (document.getElementById('buscar-contactos')?.value || '').toLowerCase().trim();
+  let lista = cacheContactos;
+  if (filtroTipoActual) lista = lista.filter(c => c.tipo === filtroTipoActual);
+  if (busqueda){
+    lista = lista.filter(c => Object.values(c).some(v => String(v||'').toLowerCase().includes(busqueda)));
+  }
+
+  if (!lista.length){ cont.innerHTML = '<p class="empty">No hay contactos que coincidan con la búsqueda.</p>'; return; }
+
+  cont.innerHTML = `<p class="empty" style="margin-bottom:8px;">${lista.length} de ${cacheContactos.length} contactos</p>` +
+    '<table><tr><th>Nombre</th><th>Torre</th><th>Tipo</th><th>Email</th><th></th></tr>' +
+    lista.map(c=>`<tr><td>${esc(c.nombre)}</td><td><span class="torre-tab ${String(c.torre).toLowerCase()}"></span>${esc(c.torre)}</td>
     <td><span class="badge ${c.tipo}">${c.tipo==='propietario'?'Propietario':'Arrendatario'}</span></td>
     <td class="mono">${esc(c.email)}</td>
     <td>
@@ -533,8 +564,17 @@ async function guardarContacto(){
 function renderExternos(){
   const cont = document.getElementById('tabla-externos');
   if (!cacheExternos.length){ cont.innerHTML = '<p class="empty">Sin contactos externos aún.</p>'; return; }
-  cont.innerHTML = '<table><tr><th>Nombre</th><th>Organización</th><th>Cargo</th><th>Email</th><th></th></tr>' +
-    cacheExternos.map(c=>`<tr><td>${esc(c.nombre)}</td><td>${esc(c.organizacion)}</td><td>${esc(c.cargo)}</td>
+
+  const busqueda = (document.getElementById('buscar-externos')?.value || '').toLowerCase().trim();
+  let lista = cacheExternos;
+  if (busqueda){
+    lista = lista.filter(c => Object.values(c).some(v => String(v||'').toLowerCase().includes(busqueda)));
+  }
+  if (!lista.length){ cont.innerHTML = '<p class="empty">No hay contactos que coincidan con la búsqueda.</p>'; return; }
+
+  cont.innerHTML = `<p class="empty" style="margin-bottom:8px;">${lista.length} de ${cacheExternos.length} contactos</p>` +
+    '<table><tr><th>Nombre</th><th>Organización</th><th>Cargo</th><th>Email</th><th></th></tr>' +
+    lista.map(c=>`<tr><td>${esc(c.nombre)}</td><td>${esc(c.organizacion)}</td><td>${esc(c.cargo)}</td>
     <td class="mono">${esc(c.email)}</td><td>
       <button class="icon-btn" onclick="abrirEnvioIndividual(${c.id}, true)">Enviar ✉</button>
       <button class="icon-btn" onclick="editarExterno(${c.id})">Editar</button>
