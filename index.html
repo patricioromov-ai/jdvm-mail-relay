@@ -54,6 +54,7 @@
   .badge.programada{background:#F2E8DA;color:var(--torre-c);}
   .badge.borrador{background:#EAEAE4;color:var(--pending);}
   .badge.enviando{background:#F2E8DA;color:var(--torre-c);}
+  .badge.pausada{background:#F7E4E4;color:var(--torre-a);}
   .badge.actualizacion{background:#E4EEE9;color:var(--torre-b);}
   .icon-btn{background:none;border:1px solid var(--line);border-radius:5px;padding:5px 9px;cursor:pointer;font-size:0.8rem;color:var(--ink-soft);}
   .icon-btn:hover{border-color:var(--ink-soft);color:var(--ink);}
@@ -225,8 +226,10 @@
 
     <!-- CAMPAÑAS -->
     <section class="view" id="view-campanas">
-      <div class="topline"><div><h2>Nueva campaña</h2><p>Comunicado directo o actualización de datos</p></div></div>
+      <div class="topline"><div><h2>Campañas</h2><p>Comunicado directo o actualización de datos</p></div></div>
       <div class="card">
+        <h3 id="cam-form-titulo">Nueva campaña</h3>
+        <input type="hidden" id="cam-id">
         <div class="form-row"><label>Nombre de la campaña</label><input type="text" id="cam-nombre"></div>
         <div class="form-row">
           <label>Tipo de campaña</label>
@@ -266,7 +269,8 @@
           </div>
         </div>
         <div class="form-row"><label>Programar envío (vacío = queda en borrador)</label><input type="datetime-local" id="cam-fecha"></div>
-        <button class="btn-primary" onclick="crearCampana()">Guardar campaña</button>
+        <button class="btn-primary" onclick="guardarCampana()">Guardar campaña</button>
+        <button class="icon-btn" onclick="cancelarEdicionCampana()">Cancelar</button>
         <span id="cam-msg" class="tag" style="margin-left:10px;display:none;"></span>
       </div>
 
@@ -385,7 +389,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
@@ -841,12 +845,97 @@ function renderCampanas(){
       const puedeEnviar = c.estado==='borrador' || c.estado==='programada' || c.estado==='enviando';
       const label = c.estado==='enviando' ? 'Continuar envío' : 'Enviar ahora';
       const btnEnviar = puedeEnviar ? `<button class="icon-btn" onclick="enviarCampanaAhora(${c.id})">${label}</button>` : '';
+      const btnPausar = c.estado==='enviando' ? `<button class="icon-btn" onclick="pausarCampana(${c.id})">Pausar</button>` : '';
+      const btnReanudar = c.estado==='pausada' ? `<button class="icon-btn" onclick="reanudarCampana(${c.id})">Reanudar envío</button>` : '';
       const btnComprobante = `<button class="icon-btn" onclick="verComprobante(${c.id})">Ver comprobante</button>`;
+      const btnCancelarProg = c.estado==='programada' ? `<button class="icon-btn" onclick="cancelarProgramacion(${c.id})">Cancelar programación</button>` : '';
+      const btnEditar = (c.estado==='borrador' || c.estado==='programada') && c.tipo!=='encuesta'
+        ? `<button class="icon-btn" onclick="editarCampana(${c.id})">Editar</button>` : '';
+      const btnDuplicar = `<button class="icon-btn" onclick="duplicarCampana(${c.id})">Duplicar</button>`;
+      const btnEliminar = `<button class="icon-btn" onclick="eliminarCampana(${c.id})">Eliminar</button>`;
       return `<tr><td>${esc(c.nombre)}</td><td><span class="badge ${c.tipo}">${c.tipo}</span></td>
-      <td><span class="badge ${c.estado}">${c.estado}</span></td><td class="mono">${esc(c.fechaProgramada)||'—'}</td><td>${btnEnviar} ${btnComprobante}</td></tr>`;
+      <td><span class="badge ${c.estado}">${c.estado}</span></td><td class="mono">${esc(c.fechaProgramada)||'—'}</td>
+      <td>${btnEnviar} ${btnPausar} ${btnReanudar} ${btnCancelarProg} ${btnComprobante} ${btnEditar} ${btnDuplicar} ${btnEliminar}</td></tr>`;
     }).join('') + '</table>';
 }
-async function crearCampana(){
+function poblarFormularioCampana(c){
+  document.getElementById('cam-id').value = c.id;
+  document.getElementById('cam-nombre').value = c.nombre;
+  document.getElementById('cam-plantilla').value = c.plantillaId;
+  document.querySelectorAll('.type-toggle .opt').forEach(o=>o.classList.remove('sel'));
+  const opt = document.querySelector(`.type-toggle .opt[data-tipo="${c.tipo}"]`);
+  if (opt) opt.classList.add('sel');
+  campanaTipoSeleccionado = c.tipo;
+
+  const seg = c.segmento ? JSON.parse(c.segmento) : { torres:[], tipos:[], externos:false };
+  document.querySelectorAll('#cam-torres input').forEach(i=> i.checked = seg.torres.includes(i.value));
+  document.querySelectorAll('#cam-tipos input').forEach(i=> i.checked = seg.tipos.includes(i.value));
+  document.getElementById('cam-externos').checked = !!seg.externos;
+
+  const esc_ = c.escalonadoConfig ? JSON.parse(c.escalonadoConfig) : { activo:false, tamano:30 };
+  document.getElementById('cam-escalonado-activo').checked = !!esc_.activo;
+  document.getElementById('cam-escalonado-tanda').value = esc_.tamano || 30;
+  document.getElementById('cam-escalonado-tanda-row').style.display = esc_.activo ? 'block' : 'none';
+
+  document.getElementById('cam-fecha').value = c.fechaProgramada ? c.fechaProgramada.replace(' ','T').slice(0,16) : '';
+}
+function editarCampana(id){
+  const c = cacheCampanas.find(x=>String(x.id)===String(id));
+  if (!c) return;
+  poblarFormularioCampana(c);
+  document.getElementById('cam-form-titulo').textContent = 'Editar campaña';
+  document.querySelector('#view-campanas .card').scrollIntoView({behavior:'smooth'});
+}
+function duplicarCampana(id){
+  const c = cacheCampanas.find(x=>String(x.id)===String(id));
+  if (!c) return;
+  if (c.tipo === 'encuesta') return alert('Para duplicar una encuesta, créala de nuevo desde la pestaña Encuestas.');
+  poblarFormularioCampana(c);
+  document.getElementById('cam-id').value = ''; // sin id = se crea como nueva
+  document.getElementById('cam-nombre').value = c.nombre + ' (copia)';
+  document.getElementById('cam-fecha').value = ''; // queda en borrador, se reprograma a mano
+  document.getElementById('cam-form-titulo').textContent = 'Nueva campaña (duplicada de "' + c.nombre + '")';
+  document.querySelector('#view-campanas .card').scrollIntoView({behavior:'smooth'});
+}
+function cancelarEdicionCampana(){
+  document.getElementById('cam-id').value = '';
+  document.getElementById('cam-nombre').value = '';
+  document.getElementById('cam-fecha').value = '';
+  document.getElementById('cam-escalonado-activo').checked = false;
+  document.getElementById('cam-escalonado-tanda-row').style.display = 'none';
+  document.querySelectorAll('#cam-torres input').forEach(i=>i.checked=true);
+  document.querySelectorAll('#cam-tipos input').forEach(i=>i.checked=false);
+  document.getElementById('cam-externos').checked = false;
+  document.getElementById('cam-form-titulo').textContent = 'Nueva campaña';
+}
+async function eliminarCampana(id){
+  if (!confirm('¿Eliminar esta campaña? El historial de envíos (comprobante) se conserva en Logs, pero la campaña desaparecerá de esta lista.')) return;
+  await api('deleteCampana', { id });
+  await cargarTodo();
+}
+async function cancelarProgramacion(id){
+  if (!confirm('¿Cancelar el envío programado? La campaña vuelve a quedar en borrador.')) return;
+  await api('updateCampana', { id, estado: 'borrador' });
+  await cargarTodo();
+}
+async function pausarCampana(id){
+  if (!confirm('¿Pausar esta campaña? Se detiene después de la tanda actual y no se enviarán más correos hasta que la reanudes.')) return;
+  await api('updateCampana', { id, estado: 'pausada' });
+  await cargarTodo();
+}
+async function reanudarCampana(id){
+  if (!confirm('¿Reanudar el envío? Se continuará mandando la siguiente tanda pendiente ahora mismo.')) return;
+  await api('updateCampana', { id, estado: 'enviando' });
+  try{
+    const r = await api('enviarCampanaAhora', { id });
+    let msg = `Enviados en esta tanda: ${r.enviados} · Fallidos: ${r.fallidos}`;
+    if (r.pendientes > 0) msg += `\nQuedan ${r.pendientes} pendientes — seguirán enviándose automáticamente.`;
+    alert(msg);
+  }catch(e){}
+  await cargarTodo();
+}
+async function guardarCampana(){
+  const id = document.getElementById('cam-id').value;
   const nombre = document.getElementById('cam-nombre').value;
   const plantillaId = document.getElementById('cam-plantilla').value;
   if(!nombre || !plantillaId) return alert('Falta nombre o plantilla');
@@ -871,10 +960,12 @@ async function crearCampana(){
     variables: JSON.stringify(variables),
     escalonadoConfig: JSON.stringify({ activo: escalonadoActivo, tamano: tanda })
   };
-  await api('addCampana', payload);
+  if (id){ payload.id = id; await api('updateCampana', payload); }
+  else { await api('addCampana', payload); }
+
   const msg = document.getElementById('cam-msg');
   msg.style.display='inline-block'; msg.textContent='✔ Campaña guardada';
-  document.getElementById('cam-nombre').value='';
+  cancelarEdicionCampana();
   await cargarTodo();
 }
 async function enviarCampanaAhora(id){
