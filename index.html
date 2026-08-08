@@ -163,6 +163,7 @@
           </div>
         </div>
         <button class="btn-primary" onclick="guardarContacto()">Guardar contacto</button>
+        <button class="icon-btn" onclick="cancelarEdicionContacto()">Cancelar</button>
       </div>
 
       <div class="subtabs">
@@ -380,11 +381,11 @@
 <script>
 // ========= CONFIGURACIÓN =========
 // Pega aquí la URL de tu implementación de Apps Script (paso 4 de la guía)
-// y la clave  que tú definiste en las Propiedades del script.
+// y la clave API_SECRET que tú definiste en las Propiedades del script.
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
@@ -506,8 +507,9 @@ function renderContactos(){
   if (!lista.length){ cont.innerHTML = '<p class="empty">No hay contactos que coincidan con la búsqueda.</p>'; return; }
 
   cont.innerHTML = `<p class="empty" style="margin-bottom:8px;">${lista.length} de ${cacheContactos.length} contactos</p>` +
-    '<table><tr><th>Nombre</th><th>Torre</th><th>Tipo</th><th>Email</th><th></th></tr>' +
+    '<table><tr><th>Nombre</th><th>Torre</th><th>Unidad</th><th>Tipo</th><th>Email</th><th></th></tr>' +
     lista.map(c=>`<tr><td>${esc(c.nombre)}</td><td><span class="torre-tab ${String(c.torre).toLowerCase()}"></span>${esc(c.torre)}</td>
+    <td class="mono">${esc(c.unidad)||'—'}</td>
     <td><span class="badge ${c.tipo}">${c.tipo==='propietario'?'Propietario':'Arrendatario'}</span></td>
     <td class="mono">${esc(c.email)}</td>
     <td>
@@ -536,6 +538,17 @@ async function eliminarContacto(id){
   if(!confirm('¿Eliminar este contacto?')) return;
   await api('deleteContacto', { id });
   await cargarTodo();
+}
+function cancelarEdicionContacto(){
+  document.getElementById('c-id').value = '';
+  document.getElementById('c-nombre').value = '';
+  document.getElementById('c-email').value = '';
+  document.getElementById('c-telefono').value = '';
+  document.getElementById('c-unidad').value = '';
+  document.getElementById('c-estacionamiento').value = '';
+  document.getElementById('c-mascota').value = 'no';
+  document.getElementById('form-contacto-titulo').textContent = 'Nuevo contacto — residente';
+  document.getElementById('form-contacto').style.display = 'none';
 }
 async function guardarContacto(){
   const id = document.getElementById('c-id').value;
