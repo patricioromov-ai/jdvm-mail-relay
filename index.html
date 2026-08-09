@@ -389,7 +389,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
@@ -836,6 +836,12 @@ async function guardarConfig(){
   setTimeout(()=>{ msg.style.display='none'; }, 3000);
 }
 
+function formatearFechaLocal(iso){
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return esc(iso);
+  return d.toLocaleString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
 // ========= CAMPAÑAS =========
 function renderCampanas(){
   const cont = document.getElementById('tabla-campanas');
@@ -854,7 +860,7 @@ function renderCampanas(){
       const btnDuplicar = `<button class="icon-btn" onclick="duplicarCampana(${c.id})">Duplicar</button>`;
       const btnEliminar = `<button class="icon-btn" onclick="eliminarCampana(${c.id})">Eliminar</button>`;
       return `<tr><td>${esc(c.nombre)}</td><td><span class="badge ${c.tipo}">${c.tipo}</span></td>
-      <td><span class="badge ${c.estado}">${c.estado}</span></td><td class="mono">${esc(c.fechaProgramada)||'—'}</td>
+      <td><span class="badge ${c.estado}">${c.estado}</span></td><td class="mono">${formatearFechaLocal(c.fechaProgramada)}</td>
       <td>${btnEnviar} ${btnPausar} ${btnReanudar} ${btnCancelarProg} ${btnComprobante} ${btnEditar} ${btnDuplicar} ${btnEliminar}</td></tr>`;
     }).join('') + '</table>';
 }
@@ -877,8 +883,13 @@ function poblarFormularioCampana(c){
   document.getElementById('cam-escalonado-tanda').value = esc_.tamano || 30;
   document.getElementById('cam-escalonado-tanda-row').style.display = esc_.activo ? 'block' : 'none';
 
-  document.getElementById('cam-fecha').value = c.fechaProgramada ? c.fechaProgramada.replace(' ','T').slice(0,16) : '';
+  document.getElementById('cam-fecha').value = c.fechaProgramada ? isoAFechaLocal(c.fechaProgramada) : '';
 }
+function isoAFechaLocal(iso){
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const pad = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
 function editarCampana(id){
   const c = cacheCampanas.find(x=>String(x.id)===String(id));
   if (!c) return;
@@ -955,7 +966,7 @@ async function guardarCampana(){
   const segmento = JSON.stringify({ torres, tipos, externos });
   const payload = {
     nombre, tipo: campanaTipoSeleccionado, plantillaId, segmento,
-    fechaProgramada: fecha ? fecha.replace('T',' ') : '',
+    fechaProgramada: fecha ? new Date(fecha).toISOString() : '',
     estado: fecha ? 'programada' : 'borrador',
     variables: JSON.stringify(variables),
     escalonadoConfig: JSON.stringify({ activo: escalonadoActivo, tamano: tanda })
