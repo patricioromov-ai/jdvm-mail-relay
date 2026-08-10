@@ -179,7 +179,7 @@
             <select id="c-mascota"><option value="no">No</option><option value="si">Sí</option></select>
           </div>
         </div>
-        <button class="btn-primary" onclick="guardarContacto()">Guardar contacto</button>
+        <button class="btn-primary" onclick="guardarContacto(this)">Guardar contacto</button>
         <button class="icon-btn" onclick="cancelarEdicionContacto()">Cancelar</button>
       </div>
 
@@ -211,7 +211,7 @@
             <div class="form-row"><label>Email</label><input type="email" id="ce-email"></div>
             <div class="form-row"><label>Teléfono</label><input type="text" id="ce-telefono" placeholder="+56 9 ..."></div>
           </div>
-          <button class="btn-primary" onclick="crearExterno()">Guardar</button>
+          <button class="btn-primary" onclick="crearExterno(this)">Guardar</button>
         </div>
         <div class="form-row">
           <input type="text" id="buscar-externos" placeholder="Buscar por nombre, organización, cargo, email..." oninput="renderExternos()">
@@ -236,7 +236,7 @@
           <div id="p-adjuntos-lista" style="margin-top:10px;"></div>
           <input type="hidden" id="p-adjunto">
         </div>
-        <button class="btn-primary" onclick="guardarPlantilla()">Guardar plantilla</button>
+        <button class="btn-primary" onclick="guardarPlantilla(this)">Guardar plantilla</button>
       </div>
       <div class="card"><div id="tabla-plantillas"><p class="empty">Cargando...</p></div></div>
     </section>
@@ -286,7 +286,7 @@
           </div>
         </div>
         <div class="form-row"><label>Programar envío (vacío = queda en borrador)</label><input type="datetime-local" id="cam-fecha"></div>
-        <button class="btn-primary" onclick="guardarCampana()">Guardar campaña</button>
+        <button class="btn-primary" onclick="guardarCampana(this)">Guardar campaña</button>
         <button class="icon-btn" onclick="cancelarEdicionCampana()">Cancelar</button>
         <span id="cam-msg" class="tag" style="margin-left:10px;display:none;"></span>
       </div>
@@ -340,7 +340,7 @@
           </select>
           <p class="empty" style="margin-top:6px;">Solo funciona bien en encuestas identificadas — en anónimas no se puede saber quién respondió, así que se reenvía a todo el segmento.</p>
         </div>
-        <button class="btn-primary" onclick="guardarEncuestaCampana()">Guardar encuesta</button>
+        <button class="btn-primary" onclick="guardarEncuestaCampana(this)">Guardar encuesta</button>
         <button class="icon-btn" onclick="cancelarEdicionEncuestaCampana()">Cancelar</button>
         <p class="empty" style="margin-top:8px;">Queda en borrador hasta que la envíes desde "Campañas".</p>
       </div>
@@ -372,7 +372,7 @@
           </div>
           <div class="form-row" id="enc-opciones-row"><label>Opciones (separadas por coma)</label><input type="text" id="enc-opciones" placeholder="Sí, No, Me da lo mismo"></div>
           <div class="form-row"><div class="check-group"><label><input type="checkbox" id="enc-identificada"> Encuesta identificada (sabrás quién respondió)</label></div></div>
-          <button class="btn-primary" onclick="guardarPregunta()">Guardar pregunta</button>
+          <button class="btn-primary" onclick="guardarPregunta(this)">Guardar pregunta</button>
         </div>
 
         <div class="card">
@@ -421,7 +421,7 @@
           </div>
         </div>
         <div class="form-row"><label>Notas (opcional)</label><input type="text" id="res-notas"></div>
-        <button class="btn-primary" onclick="guardarReserva()">Reservar</button>
+        <button class="btn-primary" onclick="guardarReserva(this)">Reservar</button>
         <button class="icon-btn" onclick="cancelarEdicionReserva()">Cancelar</button>
         <span id="res-msg" class="tag" style="margin-left:10px;display:none;"></span>
       </div>
@@ -471,7 +471,7 @@
           <label>Firma (HTML) — se agrega al final de cada correo automáticamente</label>
           <textarea id="cfg-firma" placeholder="Ej: &lt;p&gt;Comunidad Jardines de Vicuña Mackenna&lt;br&gt;contacto@jdvm.cl&lt;/p&gt;"></textarea>
         </div>
-        <button class="btn-primary" onclick="guardarConfig()">Guardar configuración</button>
+        <button class="btn-primary" onclick="guardarConfig(this)">Guardar configuración</button>
         <span id="cfg-msg" class="tag" style="margin-left:10px;display:none;"></span>
       </div>
       <div class="card">
@@ -490,7 +490,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [];
@@ -500,6 +500,28 @@ if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
   const banner = document.getElementById('config-banner');
   banner.style.display = 'block';
   banner.textContent = '⚠ Falta configurar API_SECRET en el código (línea CONFIG, arriba). Edita el archivo y reemplaza PON_AQUI_TU_API_SECRET por la clave que definiste en Apps Script.';
+}
+
+// evita que un doble clic dispare la acción dos veces mientras espera al servidor
+function iniciarCarga(boton, texto){
+  if (!boton) return true; // sin botón de referencia, no bloquea (compatibilidad)
+  if (boton.dataset.cargando === '1') return false; // ya está en curso, ignora el clic
+  boton.dataset.cargando = '1';
+  boton.disabled = true;
+  boton.dataset.textoOriginal = boton.textContent;
+  boton.textContent = texto || 'Guardando...';
+  return true;
+}
+function finCarga(boton, textoOk){
+  if (!boton) return;
+  boton.disabled = false;
+  boton.dataset.cargando = '0';
+  if (textoOk){
+    boton.textContent = textoOk;
+    setTimeout(()=>{ boton.textContent = boton.dataset.textoOriginal || 'Guardar'; }, 1500);
+  } else {
+    boton.textContent = boton.dataset.textoOriginal || 'Guardar';
+  }
 }
 
 async function api(action, payload) {
@@ -770,7 +792,8 @@ function cancelarEdicionContacto(){
   document.getElementById('form-contacto-titulo').textContent = 'Nuevo contacto — residente';
   document.getElementById('form-contacto').style.display = 'none';
 }
-async function guardarContacto(){
+async function guardarContacto(boton){
+  if (!iniciarCarga(boton)) return;
   const id = document.getElementById('c-id').value;
   const payload = {
     nombre: document.getElementById('c-nombre').value,
@@ -783,14 +806,18 @@ async function guardarContacto(){
     mascota: document.getElementById('c-mascota').value,
     etiquetas: '', activo: 'si'
   };
-  if(!payload.nombre || !payload.email) return alert('Nombre y email son obligatorios');
-  if (id){ payload.id = id; await api('updateContacto', payload); }
-  else { await api('addContacto', payload); }
-  document.getElementById('c-id').value='';
-  document.getElementById('c-nombre').value=''; document.getElementById('c-email').value='';
-  document.getElementById('form-contacto-titulo').textContent = 'Nuevo contacto — residente';
-  await cargarTodo();
-  toggleForm('form-contacto');
+  if(!payload.nombre || !payload.email){ finCarga(boton); return alert('Nombre y email son obligatorios'); }
+  try{
+    if (id){ payload.id = id; await api('updateContacto', payload); }
+    else { await api('addContacto', payload); }
+    document.getElementById('c-id').value='';
+    document.getElementById('c-nombre').value=''; document.getElementById('c-email').value='';
+    document.getElementById('form-contacto-titulo').textContent = 'Nuevo contacto — residente';
+    await cargarTodo();
+    toggleForm('form-contacto');
+  } finally {
+    finCarga(boton, '✔ Guardado');
+  }
 }
 
 // ========= CONTACTOS EXTERNOS =========
@@ -830,7 +857,8 @@ async function eliminarExterno(id){
   await api('deleteContactoExterno', { id });
   await cargarTodo();
 }
-async function crearExterno(){
+async function crearExterno(boton){
+  if (!iniciarCarga(boton)) return;
   const id = document.getElementById('ce-id').value;
   const payload = {
     nombre: document.getElementById('ce-nombre').value,
@@ -840,13 +868,17 @@ async function crearExterno(){
     telefono: document.getElementById('ce-telefono').value,
     notas: ''
   };
-  if(!payload.nombre || !payload.email) return alert('Nombre y email son obligatorios');
-  if (id){ payload.id = id; await api('updateContactoExterno', payload); }
-  else { await api('addContactoExterno', payload); }
-  document.getElementById('ce-id').value='';
-  document.getElementById('ce-telefono').value='';
-  await cargarTodo();
-  toggleForm('form-externo');
+  if(!payload.nombre || !payload.email){ finCarga(boton); return alert('Nombre y email son obligatorios'); }
+  try{
+    if (id){ payload.id = id; await api('updateContactoExterno', payload); }
+    else { await api('addContactoExterno', payload); }
+    document.getElementById('ce-id').value='';
+    document.getElementById('ce-telefono').value='';
+    await cargarTodo();
+    toggleForm('form-externo');
+  } finally {
+    finCarga(boton, '✔ Guardado');
+  }
 }
 
 // detecta variables tipo {{FECHA}} en una plantilla que no sean las automáticas
@@ -1012,7 +1044,8 @@ function renderSelectPlantillas(){
     ? cachePlantillas.map(p=>`<option value="${p.id}">${esc(p.nombre)}</option>`).join('')
     : '<option value="">Crea una plantilla primero</option>';
 }
-async function guardarPlantilla(){
+async function guardarPlantilla(boton){
+  if (!iniciarCarga(boton)) return;
   const id = document.getElementById('p-id').value;
   const payload = {
     nombre: document.getElementById('p-nombre').value,
@@ -1020,14 +1053,18 @@ async function guardarPlantilla(){
     cuerpoHtml: document.getElementById('p-cuerpo').value,
     adjuntoUrl: document.getElementById('p-adjunto').value
   };
-  if(!payload.nombre || !payload.asunto || !payload.cuerpoHtml) return alert('Completa nombre, asunto y cuerpo');
-  if (id){ payload.id = id; await api('updatePlantilla', payload); }
-  else { await api('addPlantilla', payload); }
-  document.getElementById('p-id').value='';
-  adjuntosActuales = [];
-  renderAdjuntosLista();
-  await cargarTodo();
-  toggleForm('form-plantilla');
+  if(!payload.nombre || !payload.asunto || !payload.cuerpoHtml){ finCarga(boton); return alert('Completa nombre, asunto y cuerpo'); }
+  try{
+    if (id){ payload.id = id; await api('updatePlantilla', payload); }
+    else { await api('addPlantilla', payload); }
+    document.getElementById('p-id').value='';
+    adjuntosActuales = [];
+    renderAdjuntosLista();
+    await cargarTodo();
+    toggleForm('form-plantilla');
+  } finally {
+    finCarga(boton, '✔ Guardado');
+  }
 }
 
 // ========= CONFIGURACIÓN (logo / firma) =========
@@ -1043,16 +1080,21 @@ function renderConfig(){
     previewImg.src = cacheConfig.logoUrl; previewImg.style.display = 'block';
   }
 }
-async function guardarConfig(){
-  const payload = {
-    logoUrl: document.getElementById('cfg-logo').value,
-    firmaHtml: document.getElementById('cfg-firma').value
-  };
-  cacheConfig = await api('setConfig', payload);
-  renderConfig();
-  const msg = document.getElementById('cfg-msg');
-  msg.style.display='inline-block'; msg.textContent='✔ Guardado';
-  setTimeout(()=>{ msg.style.display='none'; }, 3000);
+async function guardarConfig(boton){
+  if (!iniciarCarga(boton)) return;
+  try{
+    const payload = {
+      logoUrl: document.getElementById('cfg-logo').value,
+      firmaHtml: document.getElementById('cfg-firma').value
+    };
+    cacheConfig = await api('setConfig', payload);
+    renderConfig();
+    const msg = document.getElementById('cfg-msg');
+    msg.style.display='inline-block'; msg.textContent='✔ Guardado';
+    setTimeout(()=>{ msg.style.display='none'; }, 3000);
+  } finally {
+    finCarga(boton);
+  }
 }
 
 function formatearFechaLocal(iso){
@@ -1165,39 +1207,44 @@ async function reanudarCampana(id){
   }catch(e){}
   await cargarTodo();
 }
-async function guardarCampana(){
-  const id = document.getElementById('cam-id').value;
-  const nombre = document.getElementById('cam-nombre').value;
-  const plantillaId = document.getElementById('cam-plantilla').value;
-  if(!nombre || !plantillaId) return alert('Falta nombre o plantilla');
+async function guardarCampana(boton){
+  if (!iniciarCarga(boton)) return;
+  try{
+    const id = document.getElementById('cam-id').value;
+    const nombre = document.getElementById('cam-nombre').value;
+    const plantillaId = document.getElementById('cam-plantilla').value;
+    if(!nombre || !plantillaId) return alert('Falta nombre o plantilla');
 
-  const plantilla = cachePlantillas.find(p=>String(p.id)===String(plantillaId));
-  const libres = plantilla ? detectarVariablesLibres(plantilla.cuerpoHtml + ' ' + plantilla.asunto) : [];
-  const variables = libres.length ? pedirVariables(libres) : {};
-  if (variables === null) return; // canceló
+    const plantilla = cachePlantillas.find(p=>String(p.id)===String(plantillaId));
+    const libres = plantilla ? detectarVariablesLibres(plantilla.cuerpoHtml + ' ' + plantilla.asunto) : [];
+    const variables = libres.length ? pedirVariables(libres) : {};
+    if (variables === null) return; // canceló
 
-  const torres = Array.from(document.querySelectorAll('#cam-torres input:checked')).map(i=>i.value);
-  const tipos = Array.from(document.querySelectorAll('#cam-tipos input:checked')).map(i=>i.value);
-  const externos = document.getElementById('cam-externos').checked;
-  const fecha = document.getElementById('cam-fecha').value;
-  const escalonadoActivo = document.getElementById('cam-escalonado-activo').checked;
-  const tanda = parseInt(document.getElementById('cam-escalonado-tanda').value, 10) || 30;
+    const torres = Array.from(document.querySelectorAll('#cam-torres input:checked')).map(i=>i.value);
+    const tipos = Array.from(document.querySelectorAll('#cam-tipos input:checked')).map(i=>i.value);
+    const externos = document.getElementById('cam-externos').checked;
+    const fecha = document.getElementById('cam-fecha').value;
+    const escalonadoActivo = document.getElementById('cam-escalonado-activo').checked;
+    const tanda = parseInt(document.getElementById('cam-escalonado-tanda').value, 10) || 30;
 
-  const segmento = JSON.stringify({ torres, tipos, externos });
-  const payload = {
-    nombre, tipo: campanaTipoSeleccionado, plantillaId, segmento,
-    fechaProgramada: fecha ? new Date(fecha).toISOString() : '',
-    estado: fecha ? 'programada' : 'borrador',
-    variables: JSON.stringify(variables),
-    escalonadoConfig: JSON.stringify({ activo: escalonadoActivo, tamano: tanda })
-  };
-  if (id){ payload.id = id; await api('updateCampana', payload); }
-  else { await api('addCampana', payload); }
+    const segmento = JSON.stringify({ torres, tipos, externos });
+    const payload = {
+      nombre, tipo: campanaTipoSeleccionado, plantillaId, segmento,
+      fechaProgramada: fecha ? new Date(fecha).toISOString() : '',
+      estado: fecha ? 'programada' : 'borrador',
+      variables: JSON.stringify(variables),
+      escalonadoConfig: JSON.stringify({ activo: escalonadoActivo, tamano: tanda })
+    };
+    if (id){ payload.id = id; await api('updateCampana', payload); }
+    else { await api('addCampana', payload); }
 
-  const msg = document.getElementById('cam-msg');
-  msg.style.display='inline-block'; msg.textContent='✔ Campaña guardada';
-  cancelarEdicionCampana();
-  await cargarTodo();
+    const msg = document.getElementById('cam-msg');
+    msg.style.display='inline-block'; msg.textContent='✔ Campaña guardada';
+    cancelarEdicionCampana();
+    await cargarTodo();
+  } finally {
+    finCarga(boton, '✔ Guardado');
+  }
 }
 async function enviarCampanaAhora(id){
   if (!confirm('¿Enviar esta campaña ahora? Si tiene envío escalonado activo, se mandará solo la primera tanda.')) return;
@@ -1286,42 +1333,47 @@ function cancelarEdicionEncuestaCampana(){
   document.getElementById('ne-form-titulo').textContent = 'Nueva encuesta';
   document.getElementById('form-nueva-encuesta').style.display = 'none';
 }
-async function guardarEncuestaCampana(){
-  const id = document.getElementById('ne-id').value;
-  const nombre = document.getElementById('ne-nombre').value;
-  const plantillaId = document.getElementById('ne-plantilla').value;
-  if (!nombre || !plantillaId) return alert('Falta nombre o plantilla');
+async function guardarEncuestaCampana(boton){
+  if (!iniciarCarga(boton)) return;
+  try{
+    const id = document.getElementById('ne-id').value;
+    const nombre = document.getElementById('ne-nombre').value;
+    const plantillaId = document.getElementById('ne-plantilla').value;
+    if (!nombre || !plantillaId) return alert('Falta nombre o plantilla');
 
-  const torres = Array.from(document.querySelectorAll('#ne-torres input:checked')).map(i=>i.value);
-  const tipos = Array.from(document.querySelectorAll('#ne-tipos input:checked')).map(i=>i.value);
-  const externos = document.getElementById('ne-externos').checked;
-  const segmento = JSON.stringify({ torres, tipos, externos });
-  const fechaCierreInput = document.getElementById('ne-fecha-cierre').value;
-  const recordatorioDias = document.getElementById('ne-recordatorio-dias').value;
+    const torres = Array.from(document.querySelectorAll('#ne-torres input:checked')).map(i=>i.value);
+    const tipos = Array.from(document.querySelectorAll('#ne-tipos input:checked')).map(i=>i.value);
+    const externos = document.getElementById('ne-externos').checked;
+    const segmento = JSON.stringify({ torres, tipos, externos });
+    const fechaCierreInput = document.getElementById('ne-fecha-cierre').value;
+    const recordatorioDias = document.getElementById('ne-recordatorio-dias').value;
 
-  const payload = {
-    nombre, tipo: 'encuesta', plantillaId, segmento,
-    fechaCierre: fechaCierreInput ? new Date(fechaCierreInput).toISOString() : '',
-    recordatorioDias: recordatorioDias,
-  };
+    const payload = {
+      nombre, tipo: 'encuesta', plantillaId, segmento,
+      fechaCierre: fechaCierreInput ? new Date(fechaCierreInput).toISOString() : '',
+      recordatorioDias: recordatorioDias,
+    };
 
-  let resultado;
-  if (id){
-    payload.id = id;
-    resultado = await api('updateCampana', payload);
-  } else {
-    payload.fechaProgramada = '';
-    payload.estado = 'borrador';
-    payload.variables = '{}';
-    payload.escalonadoConfig = JSON.stringify({ activo:false });
-    payload.recordatorioEnviado = 'no';
-    resultado = await api('addCampana', payload);
+    let resultado;
+    if (id){
+      payload.id = id;
+      resultado = await api('updateCampana', payload);
+    } else {
+      payload.fechaProgramada = '';
+      payload.estado = 'borrador';
+      payload.variables = '{}';
+      payload.escalonadoConfig = JSON.stringify({ activo:false });
+      payload.recordatorioEnviado = 'no';
+      resultado = await api('addCampana', payload);
+    }
+
+    cancelarEdicionEncuestaCampana();
+    await cargarTodo();
+    document.getElementById('enc-select').value = resultado.id || id;
+    cambiarCampanaEncuesta();
+  } finally {
+    finCarga(boton, '✔ Guardado');
   }
-
-  cancelarEdicionEncuestaCampana();
-  await cargarTodo();
-  document.getElementById('enc-select').value = resultado.id || id;
-  cambiarCampanaEncuesta();
 }
 function cambiarCampanaEncuesta(){
   const id = document.getElementById('enc-select').value;
@@ -1374,22 +1426,27 @@ function cancelarEdicionPregunta(){
   document.getElementById('enc-identificada').checked = false;
   document.getElementById('enc-form-titulo').textContent = 'Agregar pregunta';
 }
-async function guardarPregunta(){
-  const id = document.getElementById('enc-id').value;
-  const campanaId = document.getElementById('enc-select').value;
-  const pregunta = document.getElementById('enc-pregunta').value;
-  const tipoPregunta = document.getElementById('enc-tipo').value;
-  const opciones = document.getElementById('enc-opciones').value;
-  const identificada = document.getElementById('enc-identificada').checked ? 'si' : 'no';
-  if (!pregunta) return alert('Escribe la pregunta');
-  if (tipoPregunta === 'opcion_multiple' && !opciones) return alert('Agrega las opciones separadas por coma');
+async function guardarPregunta(boton){
+  if (!iniciarCarga(boton)) return;
+  try{
+    const id = document.getElementById('enc-id').value;
+    const campanaId = document.getElementById('enc-select').value;
+    const pregunta = document.getElementById('enc-pregunta').value;
+    const tipoPregunta = document.getElementById('enc-tipo').value;
+    const opciones = document.getElementById('enc-opciones').value;
+    const identificada = document.getElementById('enc-identificada').checked ? 'si' : 'no';
+    if (!pregunta) return alert('Escribe la pregunta');
+    if (tipoPregunta === 'opcion_multiple' && !opciones) return alert('Agrega las opciones separadas por coma');
 
-  if (id) await api('updateEncuesta', { id, campanaId, pregunta, tipoPregunta, opciones, identificada });
-  else await api('addEncuesta', { campanaId, pregunta, tipoPregunta, opciones, identificada });
+    if (id) await api('updateEncuesta', { id, campanaId, pregunta, tipoPregunta, opciones, identificada });
+    else await api('addEncuesta', { campanaId, pregunta, tipoPregunta, opciones, identificada });
 
-  cancelarEdicionPregunta();
-  cacheEncuestas = await api('listEncuestas');
-  renderPreguntasEncuesta(campanaId);
+    cancelarEdicionPregunta();
+    cacheEncuestas = await api('listEncuestas');
+    renderPreguntasEncuesta(campanaId);
+  } finally {
+    finCarga(boton, '✔ Guardado');
+  }
 }
 async function eliminarPregunta(id){
   if (!confirm('¿Eliminar esta pregunta?')) return;
@@ -1524,7 +1581,8 @@ async function eliminarReserva(id){
   await api('updateReserva', { id, estado: 'cancelada' });
   await cargarTodo();
 }
-async function guardarReserva(){
+async function guardarReserva(boton){
+  if (!iniciarCarga(boton, 'Reservando...')) return;
   const id = document.getElementById('res-id').value;
   const espacioSel = document.getElementById('res-espacio').value;
   const espacio = espacioSel === 'Otro' ? document.getElementById('res-espacio-otro').value.trim() : espacioSel;
@@ -1536,8 +1594,8 @@ async function guardarReserva(){
   const torre = document.getElementById('res-torre').value;
   const notas = document.getElementById('res-notas').value;
 
-  if (!espacio || !fecha || !horaInicio || !horaTermino || !nombreSolicitante) return alert('Completa espacio, fecha, horario y nombre del solicitante.');
-  if (horaTermino <= horaInicio) return alert('La hora de término debe ser posterior a la de inicio.');
+  if (!espacio || !fecha || !horaInicio || !horaTermino || !nombreSolicitante){ finCarga(boton); return alert('Completa espacio, fecha, horario y nombre del solicitante.'); }
+  if (horaTermino <= horaInicio){ finCarga(boton); return alert('La hora de término debe ser posterior a la de inicio.'); }
 
   const payload = { espacio, fecha, horaInicio, horaTermino, nombreSolicitante, unidad, torre, notas };
   try{
@@ -1548,6 +1606,9 @@ async function guardarReserva(){
     limpiarFormularioReserva();
     await cargarTodo();
   }catch(e){ /* el conflicto de horario ya se muestra en el banner de error */ }
+  finally {
+    finCarga(boton, '✔ Guardado');
+  }
 }
 
 function imprimirReservas(){
