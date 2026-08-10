@@ -418,7 +418,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
@@ -534,11 +534,13 @@ function renderResumenTorre(){
     const propietarios = contactosTorre.filter(c=>c.tipo==='propietario').length;
     const arrendatarios = contactosTorre.filter(c=>c.tipo==='arrendatario').length;
     const unidadesArrendadas = new Set(contactosTorre.filter(c=>c.tipo==='arrendatario' && c.unidad).map(c=>c.unidad)).size;
-    return { torre, total: contactosTorre.length, conTelefono, propietarios, arrendatarios, unidadesArrendadas };
+    const totalDeptos = UNIDADES_TOTALES.filter(([,t])=>t===torre).length;
+    return { torre, totalDeptos, total: contactosTorre.length, conTelefono, propietarios, arrendatarios, unidadesArrendadas };
   });
 
-  cont.innerHTML = '<table><tr><th>Torre</th><th>Contactos</th><th>Con teléfono</th><th>Propietarios</th><th>Arrendatarios</th><th>Unidades arrendadas hoy</th></tr>' +
+  cont.innerHTML = '<table><tr><th>Torre</th><th>Deptos totales</th><th>Contactos</th><th>Con teléfono</th><th>Propietarios</th><th>Arrendatarios</th><th>Unidades arrendadas hoy</th></tr>' +
     filas.map(f=>`<tr><td><span class="torre-tab ${f.torre.toLowerCase()}"></span>Torre ${f.torre}</td>
+    <td class="mono">${f.totalDeptos}</td>
     <td class="mono">${f.total}</td><td class="mono">${f.conTelefono}</td>
     <td class="mono">${f.propietarios}</td><td class="mono">${f.arrendatarios}</td>
     <td class="mono">${f.unidadesArrendadas}</td></tr>`).join('') + '</table>';
