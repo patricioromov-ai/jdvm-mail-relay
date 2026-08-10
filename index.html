@@ -132,6 +132,11 @@
       </div>
 
       <div class="card">
+        <h3>Resumen por torre</h3>
+        <div id="panel-resumen-torre"><p class="empty">Cargando...</p></div>
+      </div>
+
+      <div class="card">
         <h3>Actividad por torre <span style="font-weight:400;color:var(--pending);font-size:0.8rem;">(% de apertura sobre lo enviado a cada torre)</span></h3>
         <div id="panel-actividad-torre"><p class="empty">Cargando...</p></div>
       </div>
@@ -413,7 +418,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
@@ -514,8 +519,29 @@ function renderPanel(){
       <td><span class="badge ${c.estado}">${c.estado}</span></td><td class="mono">${esc(c.fechaProgramada)||'—'}</td></tr>`).join('') + '</table>';
   }
 
+  renderResumenTorre();
   renderActividadPorTorre();
   renderCalidadDatos();
+}
+
+// ========= RESUMEN POR TORRE =========
+function renderResumenTorre(){
+  const cont = document.getElementById('panel-resumen-torre');
+  const torres = ['A','B','C','D'];
+  const filas = torres.map(torre=>{
+    const contactosTorre = cacheContactos.filter(c=>c.torre===torre);
+    const conTelefono = contactosTorre.filter(c=>c.telefono && String(c.telefono).trim()).length;
+    const propietarios = contactosTorre.filter(c=>c.tipo==='propietario').length;
+    const arrendatarios = contactosTorre.filter(c=>c.tipo==='arrendatario').length;
+    const unidadesArrendadas = new Set(contactosTorre.filter(c=>c.tipo==='arrendatario' && c.unidad).map(c=>c.unidad)).size;
+    return { torre, total: contactosTorre.length, conTelefono, propietarios, arrendatarios, unidadesArrendadas };
+  });
+
+  cont.innerHTML = '<table><tr><th>Torre</th><th>Contactos</th><th>Con teléfono</th><th>Propietarios</th><th>Arrendatarios</th><th>Unidades arrendadas hoy</th></tr>' +
+    filas.map(f=>`<tr><td><span class="torre-tab ${f.torre.toLowerCase()}"></span>Torre ${f.torre}</td>
+    <td class="mono">${f.total}</td><td class="mono">${f.conTelefono}</td>
+    <td class="mono">${f.propietarios}</td><td class="mono">${f.arrendatarios}</td>
+    <td class="mono">${f.unidadesArrendadas}</td></tr>`).join('') + '</table>';
 }
 
 // ========= MINI-DASHBOARD: ACTIVIDAD POR TORRE =========
