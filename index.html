@@ -209,6 +209,7 @@
             <div class="form-row"><label>Organización</label><input type="text" id="ce-org"></div>
             <div class="form-row"><label>Cargo</label><input type="text" id="ce-cargo"></div>
             <div class="form-row"><label>Email</label><input type="email" id="ce-email"></div>
+            <div class="form-row"><label>Teléfono</label><input type="text" id="ce-telefono" placeholder="+56 9 ..."></div>
           </div>
           <button class="btn-primary" onclick="crearExterno()">Guardar</button>
         </div>
@@ -489,7 +490,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [];
@@ -805,9 +806,9 @@ function renderExternos(){
   if (!lista.length){ cont.innerHTML = '<p class="empty">No hay contactos que coincidan con la búsqueda.</p>'; return; }
 
   cont.innerHTML = `<p class="empty" style="margin-bottom:8px;">${lista.length} de ${cacheExternos.length} contactos</p>` +
-    '<table><tr><th>Nombre</th><th>Organización</th><th>Cargo</th><th>Email</th><th></th></tr>' +
+    '<table><tr><th>Nombre</th><th>Organización</th><th>Cargo</th><th>Email</th><th>Teléfono</th><th></th></tr>' +
     lista.map(c=>`<tr><td>${esc(c.nombre)}</td><td>${esc(c.organizacion)}</td><td>${esc(c.cargo)}</td>
-    <td class="mono">${esc(c.email)}</td><td>
+    <td class="mono">${esc(c.email)}</td><td class="mono">${esc(c.telefono)||'—'}</td><td>
       <button class="icon-btn" onclick="abrirEnvioIndividual(${c.id}, true)">Enviar ✉</button>
       <button class="icon-btn" onclick="editarExterno(${c.id})">Editar</button>
       <button class="icon-btn" onclick="eliminarExterno(${c.id})">Eliminar</button>
@@ -821,6 +822,7 @@ function editarExterno(id){
   document.getElementById('ce-org').value = c.organizacion;
   document.getElementById('ce-cargo').value = c.cargo;
   document.getElementById('ce-email').value = c.email;
+  document.getElementById('ce-telefono').value = c.telefono || '';
   document.getElementById('form-externo').style.display = 'block';
 }
 async function eliminarExterno(id){
@@ -835,12 +837,14 @@ async function crearExterno(){
     organizacion: document.getElementById('ce-org').value,
     cargo: document.getElementById('ce-cargo').value,
     email: document.getElementById('ce-email').value,
+    telefono: document.getElementById('ce-telefono').value,
     notas: ''
   };
   if(!payload.nombre || !payload.email) return alert('Nombre y email son obligatorios');
   if (id){ payload.id = id; await api('updateContactoExterno', payload); }
   else { await api('addContactoExterno', payload); }
   document.getElementById('ce-id').value='';
+  document.getElementById('ce-telefono').value='';
   await cargarTodo();
   toggleForm('form-externo');
 }
