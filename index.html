@@ -108,6 +108,7 @@
       <div class="nav-item" data-view="campanas"><span class="ic">✉</span> Campañas</div>
       <div class="nav-item" data-view="encuestas"><span class="ic">◔</span> Encuestas</div>
       <div class="nav-item" data-view="seguimiento"><span class="ic">↗</span> Seguimiento</div>
+      <div class="nav-item" data-view="reservas"><span class="ic">📅</span> Reservas</div>
       <div class="nav-item" data-view="config"><span class="ic">⚙</span> Configuración</div>
     </nav>
     <div class="foot">contacto@jdvm.cl</div>
@@ -386,6 +387,60 @@
       <div class="card"><div id="tabla-seguimiento"><p class="empty">Cargando...</p></div></div>
     </section>
 
+    <!-- RESERVAS -->
+    <section class="view" id="view-reservas">
+      <div class="topline"><div><h2>Reservas</h2><p>Quincho, salones, mudanzas y otros espacios comunes</p></div></div>
+
+      <div class="card">
+        <h3 id="res-form-titulo">Nueva reserva</h3>
+        <input type="hidden" id="res-id">
+        <div class="form-grid">
+          <div class="form-row"><label>Espacio</label>
+            <select id="res-espacio" onchange="document.getElementById('res-espacio-otro').style.display = this.value==='Otro' ? 'block':'none';">
+              <option>Quincho</option>
+              <option>Salón de Eventos</option>
+              <option>Sala Multiuso</option>
+              <option>Ascensor de Carga (Mudanza)</option>
+              <option>Piscina</option>
+              <option value="Otro">Otro (especificar)</option>
+            </select>
+            <input type="text" id="res-espacio-otro" placeholder="Nombre del espacio" style="display:none;margin-top:8px;">
+          </div>
+          <div class="form-row"><label>Fecha</label><input type="date" id="res-fecha"></div>
+          <div class="form-row"><label>Hora inicio</label><input type="time" id="res-hora-inicio"></div>
+          <div class="form-row"><label>Hora término</label><input type="time" id="res-hora-termino"></div>
+          <div class="form-row"><label>Nombre solicitante</label><input type="text" id="res-nombre"></div>
+          <div class="form-row"><label>Unidad</label><input type="text" id="res-unidad" placeholder="Ej. A-0501"></div>
+        </div>
+        <div class="form-row"><label>Notas (opcional)</label><input type="text" id="res-notas"></div>
+        <button class="btn-primary" onclick="guardarReserva()">Reservar</button>
+        <button class="icon-btn" onclick="cancelarEdicionReserva()">Cancelar</button>
+        <span id="res-msg" class="tag" style="margin-left:10px;display:none;"></span>
+      </div>
+
+      <div class="card">
+        <h3>Ver disponibilidad</h3>
+        <div class="form-grid">
+          <div class="form-row"><label>Espacio</label>
+            <select id="res-filtro-espacio" onchange="renderReservas()">
+              <option value="">Todos</option>
+              <option>Quincho</option>
+              <option>Salón de Eventos</option>
+              <option>Sala Multiuso</option>
+              <option>Ascensor de Carga (Mudanza)</option>
+              <option>Piscina</option>
+            </select>
+          </div>
+          <div class="form-row"><label>Desde fecha</label><input type="date" id="res-filtro-fecha" onchange="renderReservas()"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Próximas reservas</h3>
+        <div id="tabla-reservas"><p class="empty">Cargando...</p></div>
+      </div>
+    </section>
+
     <!-- CONFIGURACIÓN -->
     <section class="view" id="view-config">
       <div class="topline"><div><h2>Configuración</h2><p>Logo y firma — se aplican automáticamente a todos los correos</p></div></div>
@@ -418,10 +473,10 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
-let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [];
+let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [];
 let campanaTipoSeleccionado = 'comunicado';
 
 if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
@@ -485,11 +540,11 @@ function toggleForm(id){
 // ========= CARGA INICIAL =========
 async function cargarTodo(){
   try{
-    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas] = await Promise.all([
-      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas')
+    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas] = await Promise.all([
+      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas')
     ]);
     renderPanel(); renderContactos(); renderExternos(); renderPlantillas();
-    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig();
+    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas();
   }catch(e){ /* el error ya se muestra en el banner */ }
 }
 cargarTodo();
@@ -1369,6 +1424,107 @@ function renderSeguimiento(){
 // Lista maestra de unidades reales (torre, código) según el registro de copropiedad,
 // usada para detectar unidades sin ningún contacto cargado (ni propietario ni arrendatario)
 const UNIDADES_TOTALES = [["A-0001","A"],["A-0002","A"],["A-0003","A"],["A-0004","A"],["A-0005","A"],["A-0006","A"],["A-0201","A"],["A-0202","A"],["A-0203","A"],["A-0204","A"],["A-0205","A"],["A-0206","A"],["A-0207","A"],["A-0208","A"],["A-0209","A"],["A-0210","A"],["A-0301","A"],["A-0302","A"],["A-0303","A"],["A-0304","A"],["A-0305","A"],["A-0306","A"],["A-0307","A"],["A-0308","A"],["A-0309","A"],["A-0310","A"],["A-0311","A"],["A-0401","A"],["A-0402","A"],["A-0403","A"],["A-0404","A"],["A-0405","A"],["A-0406","A"],["A-0407","A"],["A-0408","A"],["A-0409","A"],["A-0410","A"],["A-0411","A"],["A-0501","A"],["A-0502","A"],["A-0503","A"],["A-0504","A"],["A-0505","A"],["A-0506","A"],["A-0507","A"],["A-0508","A"],["A-0509","A"],["A-0510","A"],["A-0511","A"],["A-0601","A"],["A-0602","A"],["A-0603","A"],["A-0604","A"],["A-0605","A"],["A-0606","A"],["A-0607","A"],["A-0608","A"],["A-0609","A"],["A-0610","A"],["A-0611","A"],["A-0701","A"],["A-0702","A"],["A-0703","A"],["A-0704","A"],["A-0705","A"],["A-0706","A"],["A-0707","A"],["A-0708","A"],["A-0709","A"],["A-0710","A"],["A-0711","A"],["A-0801","A"],["A-0802","A"],["A-0803","A"],["A-0804","A"],["A-0805","A"],["A-0806","A"],["A-0807","A"],["A-0808","A"],["A-0809","A"],["A-0810","A"],["A-0811","A"],["A-0901","A"],["A-0902","A"],["A-0903","A"],["A-0904","A"],["A-0905","A"],["A-0906","A"],["A-0907","A"],["A-0908","A"],["A-0909","A"],["A-0910","A"],["A-0911","A"],["A-1001","A"],["A-1002","A"],["A-1003","A"],["A-1004","A"],["A-1005","A"],["A-1006","A"],["A-1007","A"],["A-1008","A"],["A-1009","A"],["A-1010","A"],["A-1011","A"],["A-1101","A"],["A-1102","A"],["A-1103","A"],["A-1104","A"],["A-1105","A"],["A-1106","A"],["A-1107","A"],["A-1108","A"],["A-1109","A"],["A-1110","A"],["A-1111","A"],["A-1201","A"],["A-1202","A"],["A-1203","A"],["A-1204","A"],["A-1205","A"],["A-1206","A"],["A-1207","A"],["A-1208","A"],["A-1209","A"],["A-1210","A"],["A-1211","A"],["A-1301","A"],["A-1302","A"],["A-1303","A"],["A-1304","A"],["A-1305","A"],["A-1306","A"],["A-1307","A"],["A-1308","A"],["A-1309","A"],["A-1310","A"],["A-1311","A"],["A-1401","A"],["A-1402","A"],["A-1403","A"],["A-1404","A"],["A-1405","A"],["A-1406","A"],["A-1407","A"],["A-1408","A"],["A-1409","A"],["A-1410","A"],["A-1411","A"],["A-1501","A"],["A-1502","A"],["A-1503","A"],["A-1504","A"],["A-1505","A"],["A-1506","A"],["A-1507","A"],["A-1508","A"],["A-1509","A"],["A-1510","A"],["A-1511","A"],["A-1601","A"],["A-1602","A"],["A-1603","A"],["A-1604","A"],["A-1605","A"],["A-1606","A"],["A-1607","A"],["A-1608","A"],["A-1609","A"],["A-1610","A"],["A-1611","A"],["A-1701","A"],["A-1702","A"],["A-1703","A"],["A-1704","A"],["A-1705","A"],["A-1706","A"],["A-1707","A"],["A-1708","A"],["A-1709","A"],["A-1710","A"],["A-1711","A"],["A-1801","A"],["A-1802","A"],["A-1803","A"],["A-1804","A"],["A-1805","A"],["A-1806","A"],["A-1807","A"],["A-1808","A"],["A-1809","A"],["A-1810","A"],["A-1811","A"],["A-1901","A"],["A-1902","A"],["A-1903","A"],["A-1904","A"],["A-1905","A"],["A-1906","A"],["A-1907","A"],["A-1908","A"],["A-1909","A"],["A-1910","A"],["A-1911","A"],["A-2001","A"],["A-2002","A"],["A-2003","A"],["A-2004","A"],["A-2005","A"],["A-2006","A"],["A-2007","A"],["A-2008","A"],["A-2009","A"],["A-2010","A"],["A-2011","A"],["A-2101","A"],["A-2102","A"],["A-2103","A"],["A-2104","A"],["A-2105","A"],["A-2106","A"],["A-2107","A"],["A-2108","A"],["A-2109","A"],["A-2110","A"],["A-2111","A"],["A-2201","A"],["A-2202","A"],["A-2203","A"],["A-2204","A"],["A-2205","A"],["A-2206","A"],["A-2207","A"],["A-2208","A"],["A-2209","A"],["A-2210","A"],["A-2211","A"],["A-2301","A"],["A-2302","A"],["A-2303","A"],["A-2304","A"],["A-2305","A"],["A-2306","A"],["A-2307","A"],["A-2308","A"],["A-2309","A"],["A-2310","A"],["A-2311","A"],["A-2401","A"],["A-2402","A"],["A-2403","A"],["A-2404","A"],["A-2405","A"],["A-2406","A"],["A-2407","A"],["A-2408","A"],["A-2409","A"],["A-2410","A"],["A-2411","A"],["B-0101","B"],["B-0102","B"],["B-0103","B"],["B-0104","B"],["B-0105","B"],["B-0201","B"],["B-0202","B"],["B-0203","B"],["B-0204","B"],["B-0205","B"],["B-0206","B"],["B-0207","B"],["B-0208","B"],["B-0209","B"],["B-0210","B"],["B-0301","B"],["B-0302","B"],["B-0303","B"],["B-0304","B"],["B-0305","B"],["B-0306","B"],["B-0307","B"],["B-0308","B"],["B-0309","B"],["B-0310","B"],["B-0311","B"],["B-0401","B"],["B-0402","B"],["B-0403","B"],["B-0404","B"],["B-0405","B"],["B-0406","B"],["B-0407","B"],["B-0408","B"],["B-0409","B"],["B-0410","B"],["B-0411","B"],["B-0501","B"],["B-0502","B"],["B-0503","B"],["B-0504","B"],["B-0505","B"],["B-0506","B"],["B-0507","B"],["B-0508","B"],["B-0509","B"],["B-0510","B"],["B-0511","B"],["B-0601","B"],["B-0602","B"],["B-0603","B"],["B-0604","B"],["B-0605","B"],["B-0606","B"],["B-0607","B"],["B-0608","B"],["B-0609","B"],["B-0610","B"],["B-0611","B"],["B-0701","B"],["B-0702","B"],["B-0703","B"],["B-0704","B"],["B-0705","B"],["B-0706","B"],["B-0707","B"],["B-0708","B"],["B-0709","B"],["B-0710","B"],["B-0711","B"],["B-0801","B"],["B-0802","B"],["B-0803","B"],["B-0804","B"],["B-0805","B"],["B-0806","B"],["B-0807","B"],["B-0808","B"],["B-0809","B"],["B-0810","B"],["B-0811","B"],["B-0901","B"],["B-0902","B"],["B-0903","B"],["B-0904","B"],["B-0905","B"],["B-0906","B"],["B-0907","B"],["B-0908","B"],["B-0909","B"],["B-0910","B"],["B-0911","B"],["B-1001","B"],["B-1002","B"],["B-1003","B"],["B-1004","B"],["B-1005","B"],["B-1006","B"],["B-1007","B"],["B-1008","B"],["B-1009","B"],["B-1010","B"],["B-1011","B"],["B-1101","B"],["B-1102","B"],["B-1103","B"],["B-1104","B"],["B-1105","B"],["B-1106","B"],["B-1107","B"],["B-1108","B"],["B-1109","B"],["B-1110","B"],["B-1111","B"],["B-1201","B"],["B-1202","B"],["B-1203","B"],["B-1204","B"],["B-1205","B"],["B-1206","B"],["B-1207","B"],["B-1208","B"],["B-1209","B"],["B-1210","B"],["B-1211","B"],["B-1301","B"],["B-1302","B"],["B-1303","B"],["B-1304","B"],["B-1305","B"],["B-1306","B"],["B-1307","B"],["B-1308","B"],["B-1309","B"],["B-1310","B"],["B-1311","B"],["B-1401","B"],["B-1402","B"],["B-1403","B"],["B-1404","B"],["B-1405","B"],["B-1406","B"],["B-1407","B"],["B-1408","B"],["B-1409","B"],["B-1410","B"],["B-1411","B"],["B-1501","B"],["B-1502","B"],["B-1503","B"],["B-1504","B"],["B-1505","B"],["B-1506","B"],["B-1507","B"],["B-1508","B"],["B-1509","B"],["B-1510","B"],["B-1511","B"],["B-1601","B"],["B-1602","B"],["B-1603","B"],["B-1604","B"],["B-1605","B"],["B-1606","B"],["B-1607","B"],["B-1608","B"],["B-1609","B"],["B-1610","B"],["B-1611","B"],["B-1701","B"],["B-1702","B"],["B-1703","B"],["B-1704","B"],["B-1705","B"],["B-1706","B"],["B-1707","B"],["B-1708","B"],["B-1709","B"],["B-1710","B"],["B-1711","B"],["B-1801","B"],["B-1802","B"],["B-1803","B"],["B-1804","B"],["B-1805","B"],["B-1806","B"],["B-1807","B"],["B-1808","B"],["B-1809","B"],["B-1810","B"],["B-1811","B"],["B-1901","B"],["B-1902","B"],["B-1903","B"],["B-1904","B"],["B-1905","B"],["B-1906","B"],["B-1907","B"],["B-1908","B"],["B-1909","B"],["B-1910","B"],["B-1911","B"],["B-2001","B"],["B-2002","B"],["B-2003","B"],["B-2004","B"],["B-2005","B"],["B-2006","B"],["B-2007","B"],["B-2008","B"],["B-2009","B"],["B-2010","B"],["B-2011","B"],["B-2101","B"],["B-2102","B"],["B-2103","B"],["B-2104","B"],["B-2105","B"],["B-2106","B"],["B-2107","B"],["B-2108","B"],["B-2109","B"],["B-2110","B"],["B-2111","B"],["B-2201","B"],["B-2202","B"],["B-2203","B"],["B-2204","B"],["B-2205","B"],["B-2206","B"],["B-2207","B"],["B-2208","B"],["B-2209","B"],["B-2210","B"],["B-2211","B"],["B-2301","B"],["B-2302","B"],["B-2303","B"],["B-2304","B"],["B-2305","B"],["B-2306","B"],["B-2307","B"],["B-2308","B"],["B-2309","B"],["B-2310","B"],["B-2311","B"],["B-2401","B"],["B-2402","B"],["B-2403","B"],["B-2404","B"],["B-2405","B"],["B-2406","B"],["B-2407","B"],["B-2408","B"],["B-2409","B"],["B-2410","B"],["B-2411","B"],["C-0101","C"],["C-0102","C"],["C-0103","C"],["C-0104","C"],["C-0201","C"],["C-0202","C"],["C-0203","C"],["C-0204","C"],["C-0205","C"],["C-0206","C"],["C-0207","C"],["C-0208","C"],["C-0209","C"],["C-0210","C"],["C-0301","C"],["C-0302","C"],["C-0303","C"],["C-0304","C"],["C-0305","C"],["C-0306","C"],["C-0307","C"],["C-0308","C"],["C-0309","C"],["C-0310","C"],["C-0311","C"],["C-0401","C"],["C-0402","C"],["C-0403","C"],["C-0404","C"],["C-0405","C"],["C-0406","C"],["C-0407","C"],["C-0408","C"],["C-0409","C"],["C-0410","C"],["C-0411","C"],["C-0501","C"],["C-0502","C"],["C-0503","C"],["C-0504","C"],["C-0505","C"],["C-0506","C"],["C-0507","C"],["C-0508","C"],["C-0509","C"],["C-0510","C"],["C-0511","C"],["C-0601","C"],["C-0602","C"],["C-0603","C"],["C-0604","C"],["C-0605","C"],["C-0606","C"],["C-0607","C"],["C-0608","C"],["C-0609","C"],["C-0610","C"],["C-0611","C"],["C-0701","C"],["C-0702","C"],["C-0703","C"],["C-0704","C"],["C-0705","C"],["C-0706","C"],["C-0707","C"],["C-0708","C"],["C-0709","C"],["C-0710","C"],["C-0711","C"],["C-0801","C"],["C-0802","C"],["C-0803","C"],["C-0804","C"],["C-0805","C"],["C-0806","C"],["C-0807","C"],["C-0808","C"],["C-0809","C"],["C-0810","C"],["C-0811","C"],["C-0901","C"],["C-0902","C"],["C-0903","C"],["C-0904","C"],["C-0905","C"],["C-0906","C"],["C-0907","C"],["C-0908","C"],["C-0909","C"],["C-0910","C"],["C-0911","C"],["C-1001","C"],["C-1002","C"],["C-1003","C"],["C-1004","C"],["C-1005","C"],["C-1006","C"],["C-1007","C"],["C-1008","C"],["C-1009","C"],["C-1010","C"],["C-1011","C"],["C-1101","C"],["C-1102","C"],["C-1103","C"],["C-1104","C"],["C-1105","C"],["C-1106","C"],["C-1107","C"],["C-1108","C"],["C-1109","C"],["C-1110","C"],["C-1111","C"],["C-1201","C"],["C-1202","C"],["C-1203","C"],["C-1204","C"],["C-1205","C"],["C-1206","C"],["C-1207","C"],["C-1208","C"],["C-1209","C"],["C-1210","C"],["C-1211","C"],["C-1301","C"],["C-1302","C"],["C-1303","C"],["C-1304","C"],["C-1305","C"],["C-1306","C"],["C-1307","C"],["C-1308","C"],["C-1309","C"],["C-1310","C"],["C-1311","C"],["C-1401","C"],["C-1402","C"],["C-1403","C"],["C-1404","C"],["C-1405","C"],["C-1406","C"],["C-1407","C"],["C-1408","C"],["C-1409","C"],["C-1410","C"],["C-1411","C"],["C-1501","C"],["C-1502","C"],["C-1503","C"],["C-1504","C"],["C-1505","C"],["C-1506","C"],["C-1507","C"],["C-1508","C"],["C-1509","C"],["C-1510","C"],["C-1511","C"],["C-1601","C"],["C-1602","C"],["C-1603","C"],["C-1604","C"],["C-1605","C"],["C-1606","C"],["C-1607","C"],["C-1608","C"],["C-1609","C"],["C-1610","C"],["C-1611","C"],["C-1701","C"],["C-1702","C"],["C-1703","C"],["C-1704","C"],["C-1705","C"],["C-1706","C"],["C-1707","C"],["C-1708","C"],["C-1709","C"],["C-1710","C"],["C-1711","C"],["C-1801","C"],["C-1802","C"],["C-1803","C"],["C-1804","C"],["C-1805","C"],["C-1806","C"],["C-1807","C"],["C-1808","C"],["C-1809","C"],["C-1810","C"],["C-1811","C"],["C-1901","C"],["C-1902","C"],["C-1903","C"],["C-1904","C"],["C-1905","C"],["C-1906","C"],["C-1907","C"],["C-1908","C"],["C-1909","C"],["C-1910","C"],["C-1911","C"],["C-2001","C"],["C-2002","C"],["C-2003","C"],["C-2004","C"],["C-2005","C"],["C-2006","C"],["C-2007","C"],["C-2008","C"],["C-2009","C"],["C-2010","C"],["C-2011","C"],["C-2101","C"],["C-2102","C"],["C-2103","C"],["C-2104","C"],["C-2105","C"],["C-2106","C"],["C-2107","C"],["C-2108","C"],["C-2109","C"],["C-2110","C"],["C-2111","C"],["C-2201","C"],["C-2202","C"],["C-2203","C"],["C-2204","C"],["C-2205","C"],["C-2206","C"],["C-2207","C"],["C-2208","C"],["C-2209","C"],["C-2210","C"],["C-2211","C"],["C-2301","C"],["C-2302","C"],["C-2303","C"],["C-2304","C"],["C-2305","C"],["C-2306","C"],["C-2307","C"],["C-2308","C"],["C-2309","C"],["C-2310","C"],["C-2311","C"],["C-2401","C"],["C-2402","C"],["C-2403","C"],["C-2404","C"],["C-2405","C"],["C-2406","C"],["C-2407","C"],["C-2408","C"],["C-2409","C"],["C-2410","C"],["C-2411","C"],["D-0101","D"],["D-0102","D"],["D-0103","D"],["D-0104","D"],["D-0201","D"],["D-0202","D"],["D-0203","D"],["D-0204","D"],["D-0205","D"],["D-0206","D"],["D-0207","D"],["D-0208","D"],["D-0209","D"],["D-0210","D"],["D-0301","D"],["D-0302","D"],["D-0303","D"],["D-0304","D"],["D-0305","D"],["D-0306","D"],["D-0307","D"],["D-0308","D"],["D-0309","D"],["D-0310","D"],["D-0311","D"],["D-0401","D"],["D-0402","D"],["D-0403","D"],["D-0404","D"],["D-0405","D"],["D-0406","D"],["D-0407","D"],["D-0408","D"],["D-0409","D"],["D-0410","D"],["D-0411","D"],["D-0501","D"],["D-0502","D"],["D-0503","D"],["D-0504","D"],["D-0505","D"],["D-0506","D"],["D-0507","D"],["D-0508","D"],["D-0509","D"],["D-0510","D"],["D-0511","D"],["D-0601","D"],["D-0602","D"],["D-0603","D"],["D-0604","D"],["D-0605","D"],["D-0606","D"],["D-0607","D"],["D-0608","D"],["D-0609","D"],["D-0610","D"],["D-0611","D"],["D-0701","D"],["D-0702","D"],["D-0703","D"],["D-0704","D"],["D-0705","D"],["D-0706","D"],["D-0707","D"],["D-0708","D"],["D-0709","D"],["D-0710","D"],["D-0711","D"],["D-0801","D"],["D-0802","D"],["D-0803","D"],["D-0804","D"],["D-0805","D"],["D-0806","D"],["D-0807","D"],["D-0808","D"],["D-0809","D"],["D-0810","D"],["D-0811","D"],["D-0901","D"],["D-0902","D"],["D-0903","D"],["D-0904","D"],["D-0905","D"],["D-0906","D"],["D-0907","D"],["D-0908","D"],["D-0909","D"],["D-0910","D"],["D-0911","D"],["D-1001","D"],["D-1002","D"],["D-1003","D"],["D-1004","D"],["D-1005","D"],["D-1006","D"],["D-1007","D"],["D-1008","D"],["D-1009","D"],["D-1010","D"],["D-1011","D"],["D-1101","D"],["D-1102","D"],["D-1103","D"],["D-1104","D"],["D-1105","D"],["D-1106","D"],["D-1107","D"],["D-1108","D"],["D-1109","D"],["D-1110","D"],["D-1111","D"],["D-1201","D"],["D-1202","D"],["D-1203","D"],["D-1204","D"],["D-1205","D"],["D-1206","D"],["D-1207","D"],["D-1208","D"],["D-1209","D"],["D-1210","D"],["D-1211","D"],["D-1301","D"],["D-1302","D"],["D-1303","D"],["D-1304","D"],["D-1305","D"],["D-1306","D"],["D-1307","D"],["D-1308","D"],["D-1309","D"],["D-1310","D"],["D-1311","D"],["D-1401","D"],["D-1402","D"],["D-1403","D"],["D-1404","D"],["D-1405","D"],["D-1406","D"],["D-1407","D"],["D-1408","D"],["D-1409","D"],["D-1410","D"],["D-1411","D"],["D-1501","D"],["D-1502","D"],["D-1503","D"],["D-1504","D"],["D-1505","D"],["D-1506","D"],["D-1507","D"],["D-1508","D"],["D-1509","D"],["D-1510","D"],["D-1511","D"],["D-1601","D"],["D-1602","D"],["D-1603","D"],["D-1604","D"],["D-1605","D"],["D-1606","D"],["D-1607","D"],["D-1608","D"],["D-1609","D"],["D-1610","D"],["D-1611","D"],["D-1701","D"],["D-1702","D"],["D-1703","D"],["D-1704","D"],["D-1705","D"],["D-1706","D"],["D-1707","D"],["D-1708","D"],["D-1709","D"],["D-1710","D"],["D-1711","D"],["D-1801","D"],["D-1802","D"],["D-1803","D"],["D-1804","D"],["D-1805","D"],["D-1806","D"],["D-1807","D"],["D-1808","D"],["D-1809","D"],["D-1810","D"],["D-1811","D"],["D-1901","D"],["D-1902","D"],["D-1903","D"],["D-1904","D"],["D-1905","D"],["D-1906","D"],["D-1907","D"],["D-1908","D"],["D-1909","D"],["D-1910","D"],["D-1911","D"],["D-2001","D"],["D-2002","D"],["D-2003","D"],["D-2004","D"],["D-2005","D"],["D-2006","D"],["D-2007","D"],["D-2008","D"],["D-2009","D"],["D-2010","D"],["D-2011","D"],["D-2101","D"],["D-2102","D"],["D-2103","D"],["D-2104","D"],["D-2105","D"],["D-2106","D"],["D-2107","D"],["D-2108","D"],["D-2109","D"],["D-2110","D"],["D-2111","D"],["D-2201","D"],["D-2202","D"],["D-2203","D"],["D-2204","D"],["D-2205","D"],["D-2206","D"],["D-2207","D"],["D-2208","D"],["D-2209","D"],["D-2210","D"],["D-2211","D"],["D-2301","D"],["D-2302","D"],["D-2303","D"],["D-2304","D"],["D-2305","D"],["D-2306","D"],["D-2307","D"],["D-2308","D"],["D-2309","D"],["D-2310","D"],["D-2311","D"],["D-2401","D"],["D-2402","D"],["D-2403","D"],["D-2404","D"],["D-2405","D"],["D-2406","D"],["D-2407","D"],["D-2408","D"],["D-2409","D"],["D-2410","D"],["D-2411","D"]];
+
+// ========= RESERVAS =========
+function renderReservas(){
+  const cont = document.getElementById('tabla-reservas');
+  const filtroEspacio = document.getElementById('res-filtro-espacio')?.value || '';
+  const filtroFecha = document.getElementById('res-filtro-fecha')?.value || '';
+
+  let lista = cacheReservas.filter(r => r.estado !== 'cancelada');
+  if (filtroEspacio) lista = lista.filter(r => r.espacio === filtroEspacio);
+  if (filtroFecha) lista = lista.filter(r => r.fecha >= filtroFecha);
+  lista = lista.sort((a,b) => (a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
+
+  if (!lista.length){ cont.innerHTML = '<p class="empty">No hay reservas que coincidan.</p>'; return; }
+
+  // agrupar por fecha para que se vea como agenda
+  const grupos = {};
+  lista.forEach(r=>{ (grupos[r.fecha] = grupos[r.fecha] || []).push(r); });
+
+  cont.innerHTML = Object.keys(grupos).sort().map(fecha=>{
+    const filas = grupos[fecha].map(r=>`<tr>
+      <td class="mono">${esc(r.horaInicio)}–${esc(r.horaTermino)}</td>
+      <td>${esc(r.espacio)}</td>
+      <td>${esc(r.nombreSolicitante)}${r.unidad ? ' ('+esc(r.unidad)+')' : ''}</td>
+      <td>${esc(r.notas)||'—'}</td>
+      <td><button class="icon-btn" onclick="editarReserva(${r.id})">Editar</button>
+      <button class="icon-btn" onclick="eliminarReserva(${r.id})">Cancelar</button></td>
+    </tr>`).join('');
+    return `<h3 style="font-size:0.95rem;margin:16px 0 8px;">${formatearFechaSolo(fecha)}</h3>
+      <table><tr><th>Horario</th><th>Espacio</th><th>Solicitante</th><th>Notas</th><th></th></tr>${filas}</table>`;
+  }).join('');
+}
+function formatearFechaSolo(fechaYMD){
+  const [y,m,d] = fechaYMD.split('-');
+  const fecha = new Date(Number(y), Number(m)-1, Number(d));
+  return fecha.toLocaleDateString('es-CL', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+}
+function limpiarFormularioReserva(){
+  document.getElementById('res-id').value = '';
+  document.getElementById('res-espacio').value = 'Quincho';
+  document.getElementById('res-espacio-otro').value = '';
+  document.getElementById('res-espacio-otro').style.display = 'none';
+  document.getElementById('res-fecha').value = '';
+  document.getElementById('res-hora-inicio').value = '';
+  document.getElementById('res-hora-termino').value = '';
+  document.getElementById('res-nombre').value = '';
+  document.getElementById('res-unidad').value = '';
+  document.getElementById('res-notas').value = '';
+  document.getElementById('res-form-titulo').textContent = 'Nueva reserva';
+}
+function cancelarEdicionReserva(){ limpiarFormularioReserva(); }
+function editarReserva(id){
+  const r = cacheReservas.find(x=>String(x.id)===String(id));
+  if (!r) return;
+  document.getElementById('res-id').value = r.id;
+  const espacios = ['Quincho','Salón de Eventos','Sala Multiuso','Ascensor de Carga (Mudanza)','Piscina'];
+  if (espacios.includes(r.espacio)){
+    document.getElementById('res-espacio').value = r.espacio;
+    document.getElementById('res-espacio-otro').style.display = 'none';
+  } else {
+    document.getElementById('res-espacio').value = 'Otro';
+    document.getElementById('res-espacio-otro').style.display = 'block';
+    document.getElementById('res-espacio-otro').value = r.espacio;
+  }
+  document.getElementById('res-fecha').value = r.fecha;
+  document.getElementById('res-hora-inicio').value = r.horaInicio;
+  document.getElementById('res-hora-termino').value = r.horaTermino;
+  document.getElementById('res-nombre').value = r.nombreSolicitante;
+  document.getElementById('res-unidad').value = r.unidad;
+  document.getElementById('res-notas').value = r.notas;
+  document.getElementById('res-form-titulo').textContent = 'Editar reserva';
+  document.querySelector('#view-reservas .card').scrollIntoView({behavior:'smooth'});
+}
+async function eliminarReserva(id){
+  if (!confirm('¿Cancelar esta reserva? Queda marcada como cancelada, no se borra del historial.')) return;
+  await api('updateReserva', { id, estado: 'cancelada' });
+  await cargarTodo();
+}
+async function guardarReserva(){
+  const id = document.getElementById('res-id').value;
+  const espacioSel = document.getElementById('res-espacio').value;
+  const espacio = espacioSel === 'Otro' ? document.getElementById('res-espacio-otro').value.trim() : espacioSel;
+  const fecha = document.getElementById('res-fecha').value;
+  const horaInicio = document.getElementById('res-hora-inicio').value;
+  const horaTermino = document.getElementById('res-hora-termino').value;
+  const nombreSolicitante = document.getElementById('res-nombre').value;
+  const unidad = document.getElementById('res-unidad').value;
+  const notas = document.getElementById('res-notas').value;
+
+  if (!espacio || !fecha || !horaInicio || !horaTermino || !nombreSolicitante) return alert('Completa espacio, fecha, horario y nombre del solicitante.');
+  if (horaTermino <= horaInicio) return alert('La hora de término debe ser posterior a la de inicio.');
+
+  const payload = { espacio, fecha, horaInicio, horaTermino, nombreSolicitante, unidad, notas };
+  try{
+    if (id){ payload.id = id; await api('updateReserva', payload); }
+    else { await api('addReserva', payload); }
+    const msg = document.getElementById('res-msg');
+    msg.style.display='inline-block'; msg.textContent='✔ Reserva guardada';
+    limpiarFormularioReserva();
+    await cargarTodo();
+  }catch(e){ /* el conflicto de horario ya se muestra en el banner de error */ }
+}
 
 // ========= UTIL =========
 function esc(s){
