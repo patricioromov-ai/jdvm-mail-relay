@@ -411,6 +411,13 @@
           <div class="form-row"><label>Hora término</label><input type="time" id="res-hora-termino"></div>
           <div class="form-row"><label>Nombre solicitante</label><input type="text" id="res-nombre"></div>
           <div class="form-row"><label>Unidad</label><input type="text" id="res-unidad" placeholder="Ej. A-0501"></div>
+          <div class="form-row"><label>Torre que ocupará el espacio</label>
+            <select id="res-torre">
+              <option value="">No especifica</option>
+              <option>A</option><option>B</option><option>C</option><option>D</option>
+            </select>
+            <p class="empty" style="margin-top:6px;">Puede ser distinta a la torre donde vive el solicitante (ej. reserva el quincho de otra torre).</p>
+          </div>
         </div>
         <div class="form-row"><label>Notas (opcional)</label><input type="text" id="res-notas"></div>
         <button class="btn-primary" onclick="guardarReserva()">Reservar</button>
@@ -433,6 +440,15 @@
           </div>
           <div class="form-row"><label>Desde fecha</label><input type="date" id="res-filtro-fecha" onchange="renderReservas()"></div>
         </div>
+      </div>
+
+      <div class="card">
+        <h3>Imprimir hoja de reservas</h3>
+        <div class="form-grid">
+          <div class="form-row"><label>Desde</label><input type="date" id="print-fecha-inicio"></div>
+          <div class="form-row"><label>Hasta</label><input type="date" id="print-fecha-fin"></div>
+        </div>
+        <button class="icon-btn" onclick="imprimirReservas()">🖨 Imprimir rango</button>
       </div>
 
       <div class="card">
@@ -473,7 +489,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [];
@@ -1447,12 +1463,13 @@ function renderReservas(){
       <td class="mono">${esc(r.horaInicio)}–${esc(r.horaTermino)}</td>
       <td>${esc(r.espacio)}</td>
       <td>${esc(r.nombreSolicitante)}${r.unidad ? ' ('+esc(r.unidad)+')' : ''}</td>
+      <td>${r.torre ? '<span class="torre-tab '+String(r.torre).toLowerCase()+'"></span>'+esc(r.torre) : '—'}</td>
       <td>${esc(r.notas)||'—'}</td>
       <td><button class="icon-btn" onclick="editarReserva(${r.id})">Editar</button>
       <button class="icon-btn" onclick="eliminarReserva(${r.id})">Cancelar</button></td>
     </tr>`).join('');
     return `<h3 style="font-size:0.95rem;margin:16px 0 8px;">${formatearFechaSolo(fecha)}</h3>
-      <table><tr><th>Horario</th><th>Espacio</th><th>Solicitante</th><th>Notas</th><th></th></tr>${filas}</table>`;
+      <table><tr><th>Horario</th><th>Espacio</th><th>Solicitante</th><th>Torre</th><th>Notas</th><th></th></tr>${filas}</table>`;
   }).join('');
 }
 function formatearFechaSolo(fechaYMD){
@@ -1470,6 +1487,7 @@ function limpiarFormularioReserva(){
   document.getElementById('res-hora-termino').value = '';
   document.getElementById('res-nombre').value = '';
   document.getElementById('res-unidad').value = '';
+  document.getElementById('res-torre').value = '';
   document.getElementById('res-notas').value = '';
   document.getElementById('res-form-titulo').textContent = 'Nueva reserva';
 }
@@ -1492,6 +1510,7 @@ function editarReserva(id){
   document.getElementById('res-hora-termino').value = r.horaTermino;
   document.getElementById('res-nombre').value = r.nombreSolicitante;
   document.getElementById('res-unidad').value = r.unidad;
+  document.getElementById('res-torre').value = r.torre || '';
   document.getElementById('res-notas').value = r.notas;
   document.getElementById('res-form-titulo').textContent = 'Editar reserva';
   document.querySelector('#view-reservas .card').scrollIntoView({behavior:'smooth'});
@@ -1510,12 +1529,13 @@ async function guardarReserva(){
   const horaTermino = document.getElementById('res-hora-termino').value;
   const nombreSolicitante = document.getElementById('res-nombre').value;
   const unidad = document.getElementById('res-unidad').value;
+  const torre = document.getElementById('res-torre').value;
   const notas = document.getElementById('res-notas').value;
 
   if (!espacio || !fecha || !horaInicio || !horaTermino || !nombreSolicitante) return alert('Completa espacio, fecha, horario y nombre del solicitante.');
   if (horaTermino <= horaInicio) return alert('La hora de término debe ser posterior a la de inicio.');
 
-  const payload = { espacio, fecha, horaInicio, horaTermino, nombreSolicitante, unidad, notas };
+  const payload = { espacio, fecha, horaInicio, horaTermino, nombreSolicitante, unidad, torre, notas };
   try{
     if (id){ payload.id = id; await api('updateReserva', payload); }
     else { await api('addReserva', payload); }
@@ -1524,6 +1544,58 @@ async function guardarReserva(){
     limpiarFormularioReserva();
     await cargarTodo();
   }catch(e){ /* el conflicto de horario ya se muestra en el banner de error */ }
+}
+
+function imprimirReservas(){
+  const desde = document.getElementById('print-fecha-inicio').value;
+  const hasta = document.getElementById('print-fecha-fin').value;
+  if (!desde || !hasta) return alert('Selecciona fecha de inicio y de término.');
+  if (hasta < desde) return alert('La fecha de término debe ser igual o posterior a la de inicio.');
+
+  let lista = cacheReservas.filter(r => r.estado !== 'cancelada' && r.fecha >= desde && r.fecha <= hasta);
+  lista = lista.sort((a,b) => (a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
+
+  const grupos = {};
+  lista.forEach(r=>{ (grupos[r.fecha] = grupos[r.fecha] || []).push(r); });
+
+  const nombreEdificio = 'Comunidad Jardines de Vicuña Mackenna';
+  let cuerpo = '';
+  if (!lista.length){
+    cuerpo = '<p>Sin reservas registradas en este rango de fechas.</p>';
+  } else {
+    cuerpo = Object.keys(grupos).sort().map(fecha=>{
+      const filas = grupos[fecha].map(r=>`<tr>
+        <td>${esc(r.horaInicio)}–${esc(r.horaTermino)}</td>
+        <td>${esc(r.espacio)}</td>
+        <td>${esc(r.nombreSolicitante)}${r.unidad ? ' ('+esc(r.unidad)+')' : ''}</td>
+        <td>${r.torre ? 'Torre '+esc(r.torre) : '—'}</td>
+        <td>${esc(r.notas)||'—'}</td>
+      </tr>`).join('');
+      return `<h3>${formatearFechaSolo(fecha)}</h3>
+        <table><tr><th>Horario</th><th>Espacio</th><th>Solicitante</th><th>Torre</th><th>Notas</th></tr>${filas}</table>`;
+    }).join('');
+  }
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Hoja de reservas</title>
+  <style>
+    body{font-family:Arial,sans-serif;color:#1F2A44;padding:24px;}
+    h1{font-size:1.3rem;margin-bottom:2px;}
+    .sub{color:#4A5568;font-size:0.9rem;margin-bottom:20px;}
+    h3{font-size:1rem;margin:18px 0 6px;border-bottom:1px solid #ccc;padding-bottom:4px;}
+    table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:0.85rem;}
+    th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;}
+    th{background:#F0EFEA;}
+    @media print{ body{padding:0;} }
+  </style></head><body>
+  <h1>${nombreEdificio} — Hoja de reservas</h1>
+  <p class="sub">Rango: ${desde} al ${hasta} · Generado el ${new Date().toLocaleDateString('es-CL')}</p>
+  ${cuerpo}
+  </body></html>`;
+
+  const ventana = window.open('', '_blank');
+  ventana.document.write(html);
+  ventana.document.close();
+  ventana.onload = () => ventana.print();
 }
 
 // ========= UTIL =========
