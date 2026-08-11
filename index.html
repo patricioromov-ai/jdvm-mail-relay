@@ -190,12 +190,19 @@
 
       <div class="card" id="sub-residentes">
         <div class="form-row">
-          <input type="text" id="buscar-contactos" placeholder="Buscar por nombre, email, torre, unidad, teléfono..." oninput="renderContactos()">
+          <input type="text" id="buscar-contactos" placeholder="Buscar por nombre, email, unidad, teléfono, estacionamiento..." oninput="renderContactos()">
         </div>
-        <div class="subtabs" style="margin-bottom:14px;">
+        <div class="subtabs" style="margin-bottom:10px;">
           <div class="filtro-tab active" data-filtro-tipo="" onclick="filtrarPorTipo('', this)">Todos</div>
           <div class="filtro-tab" data-filtro-tipo="propietario" onclick="filtrarPorTipo('propietario', this)">Propietarios</div>
           <div class="filtro-tab" data-filtro-tipo="arrendatario" onclick="filtrarPorTipo('arrendatario', this)">Arrendatarios</div>
+        </div>
+        <div class="subtabs" style="margin-bottom:14px;">
+          <div class="filtro-tab active" data-filtro-torre="" onclick="filtrarPorTorre('', this)">Todas las torres</div>
+          <div class="filtro-tab" data-filtro-torre="A" onclick="filtrarPorTorre('A', this)"><span class="torre-tab a"></span>Torre A</div>
+          <div class="filtro-tab" data-filtro-torre="B" onclick="filtrarPorTorre('B', this)"><span class="torre-tab b"></span>Torre B</div>
+          <div class="filtro-tab" data-filtro-torre="C" onclick="filtrarPorTorre('C', this)"><span class="torre-tab c"></span>Torre C</div>
+          <div class="filtro-tab" data-filtro-torre="D" onclick="filtrarPorTorre('D', this)"><span class="torre-tab d"></span>Torre D</div>
         </div>
         <div id="tabla-contactos"><p class="empty">Cargando...</p></div>
       </div>
@@ -490,7 +497,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [];
@@ -729,9 +736,16 @@ function renderCalidadDatos(){
 
 // ========= CONTACTOS =========
 let filtroTipoActual = '';
+let filtroTorreActual = '';
 function filtrarPorTipo(tipo, elemento){
   filtroTipoActual = tipo;
-  document.querySelectorAll('#sub-residentes .filtro-tab').forEach(t=>t.classList.remove('active'));
+  elemento.parentElement.querySelectorAll('.filtro-tab').forEach(t=>t.classList.remove('active'));
+  elemento.classList.add('active');
+  renderContactos();
+}
+function filtrarPorTorre(torre, elemento){
+  filtroTorreActual = torre;
+  elemento.parentElement.querySelectorAll('.filtro-tab').forEach(t=>t.classList.remove('active'));
   elemento.classList.add('active');
   renderContactos();
 }
@@ -742,6 +756,7 @@ function renderContactos(){
   const busqueda = (document.getElementById('buscar-contactos')?.value || '').toLowerCase().trim();
   let lista = cacheContactos;
   if (filtroTipoActual) lista = lista.filter(c => c.tipo === filtroTipoActual);
+  if (filtroTorreActual) lista = lista.filter(c => c.torre === filtroTorreActual);
   if (busqueda){
     lista = lista.filter(c => Object.values(c).some(v => String(v||'').toLowerCase().includes(busqueda)));
   }
