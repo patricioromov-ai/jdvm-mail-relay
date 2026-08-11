@@ -175,6 +175,7 @@
           <div class="form-row"><label>Teléfono</label><input type="text" id="c-telefono" placeholder="+56 9 ..."></div>
           <div class="form-row"><label>N° depto/unidad</label><input type="text" id="c-unidad"></div>
           <div class="form-row"><label>N° estacionamiento</label><input type="text" id="c-estacionamiento"></div>
+          <div class="form-row"><label>N° bodega</label><input type="text" id="c-bodega"></div>
           <div class="form-row"><label>¿Tiene mascota?</label>
             <select id="c-mascota"><option value="no">No</option><option value="si">Sí</option></select>
           </div>
@@ -205,6 +206,9 @@
           <div class="filtro-tab" data-filtro-torre="D" onclick="filtrarPorTorre('D', this)"><span class="torre-tab d"></span>Torre D</div>
           <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;border:1px solid var(--line);padding:6px 12px;border-radius:20px;background:#fff;cursor:pointer;margin-left:6px;">
             <input type="checkbox" id="filtro-estacionamiento" onchange="renderContactos()"> Solo con estacionamiento
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;border:1px solid var(--line);padding:6px 12px;border-radius:20px;background:#fff;cursor:pointer;">
+            <input type="checkbox" id="filtro-bodega" onchange="renderContactos()"> Solo con bodega
           </label>
         </div>
         <div id="tabla-contactos"><p class="empty">Cargando...</p></div>
@@ -500,7 +504,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [];
@@ -758,10 +762,12 @@ function renderContactos(){
 
   const busqueda = (document.getElementById('buscar-contactos')?.value || '').toLowerCase().trim();
   const soloConEstacionamiento = document.getElementById('filtro-estacionamiento')?.checked;
+  const soloConBodega = document.getElementById('filtro-bodega')?.checked;
   let lista = cacheContactos;
   if (filtroTipoActual) lista = lista.filter(c => c.tipo === filtroTipoActual);
   if (filtroTorreActual) lista = lista.filter(c => c.torre === filtroTorreActual);
   if (soloConEstacionamiento) lista = lista.filter(c => c.estacionamiento && String(c.estacionamiento).trim());
+  if (soloConBodega) lista = lista.filter(c => c.bodega && String(c.bodega).trim());
   if (busqueda){
     lista = lista.filter(c => Object.values(c).some(v => String(v||'').toLowerCase().includes(busqueda)));
   }
@@ -769,10 +775,11 @@ function renderContactos(){
   if (!lista.length){ cont.innerHTML = '<p class="empty">No hay contactos que coincidan con la búsqueda.</p>'; return; }
 
   cont.innerHTML = `<p class="empty" style="margin-bottom:8px;">${lista.length} de ${cacheContactos.length} contactos</p>` +
-    '<table><tr><th>Nombre</th><th>Torre</th><th>Unidad</th><th>Estacionamiento</th><th>Tipo</th><th>Email</th><th></th></tr>' +
+    '<table><tr><th>Nombre</th><th>Torre</th><th>Unidad</th><th>Estacionamiento</th><th>Bodega</th><th>Tipo</th><th>Email</th><th></th></tr>' +
     lista.map(c=>`<tr><td>${esc(c.nombre)}</td><td><span class="torre-tab ${String(c.torre).toLowerCase()}"></span>${esc(c.torre)}</td>
     <td class="mono">${esc(c.unidad)||'—'}</td>
     <td class="mono">${esc(c.estacionamiento)||'—'}</td>
+    <td class="mono">${esc(c.bodega)||'—'}</td>
     <td><span class="badge ${c.tipo}">${c.tipo==='propietario'?'Propietario':'Arrendatario'}</span></td>
     <td class="mono">${esc(c.email)}</td>
     <td>
@@ -792,6 +799,7 @@ function editarContacto(id){
   document.getElementById('c-telefono').value = c.telefono || '';
   document.getElementById('c-unidad').value = c.unidad || '';
   document.getElementById('c-estacionamiento').value = c.estacionamiento || '';
+  document.getElementById('c-bodega').value = c.bodega || '';
   document.getElementById('c-mascota').value = c.mascota || 'no';
   document.getElementById('form-contacto-titulo').textContent = 'Editar contacto';
   document.getElementById('form-contacto').style.display = 'block';
@@ -809,6 +817,7 @@ function cancelarEdicionContacto(){
   document.getElementById('c-telefono').value = '';
   document.getElementById('c-unidad').value = '';
   document.getElementById('c-estacionamiento').value = '';
+  document.getElementById('c-bodega').value = '';
   document.getElementById('c-mascota').value = 'no';
   document.getElementById('form-contacto-titulo').textContent = 'Nuevo contacto — residente';
   document.getElementById('form-contacto').style.display = 'none';
@@ -824,6 +833,7 @@ async function guardarContacto(boton){
     telefono: document.getElementById('c-telefono').value,
     unidad: document.getElementById('c-unidad').value,
     estacionamiento: document.getElementById('c-estacionamiento').value,
+    bodega: document.getElementById('c-bodega').value,
     mascota: document.getElementById('c-mascota').value,
     etiquetas: '', activo: 'si'
   };
