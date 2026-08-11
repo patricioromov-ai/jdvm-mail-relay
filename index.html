@@ -197,12 +197,15 @@
           <div class="filtro-tab" data-filtro-tipo="propietario" onclick="filtrarPorTipo('propietario', this)">Propietarios</div>
           <div class="filtro-tab" data-filtro-tipo="arrendatario" onclick="filtrarPorTipo('arrendatario', this)">Arrendatarios</div>
         </div>
-        <div class="subtabs" style="margin-bottom:14px;">
+        <div class="subtabs" style="margin-bottom:14px;align-items:center;">
           <div class="filtro-tab active" data-filtro-torre="" onclick="filtrarPorTorre('', this)">Todas las torres</div>
           <div class="filtro-tab" data-filtro-torre="A" onclick="filtrarPorTorre('A', this)"><span class="torre-tab a"></span>Torre A</div>
           <div class="filtro-tab" data-filtro-torre="B" onclick="filtrarPorTorre('B', this)"><span class="torre-tab b"></span>Torre B</div>
           <div class="filtro-tab" data-filtro-torre="C" onclick="filtrarPorTorre('C', this)"><span class="torre-tab c"></span>Torre C</div>
           <div class="filtro-tab" data-filtro-torre="D" onclick="filtrarPorTorre('D', this)"><span class="torre-tab d"></span>Torre D</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;border:1px solid var(--line);padding:6px 12px;border-radius:20px;background:#fff;cursor:pointer;margin-left:6px;">
+            <input type="checkbox" id="filtro-estacionamiento" onchange="renderContactos()"> Solo con estacionamiento
+          </label>
         </div>
         <div id="tabla-contactos"><p class="empty">Cargando...</p></div>
       </div>
@@ -497,7 +500,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [];
@@ -754,9 +757,11 @@ function renderContactos(){
   if (!cacheContactos.length){ cont.innerHTML = '<p class="empty">Sin contactos aún. Agrega el primero arriba.</p>'; return; }
 
   const busqueda = (document.getElementById('buscar-contactos')?.value || '').toLowerCase().trim();
+  const soloConEstacionamiento = document.getElementById('filtro-estacionamiento')?.checked;
   let lista = cacheContactos;
   if (filtroTipoActual) lista = lista.filter(c => c.tipo === filtroTipoActual);
   if (filtroTorreActual) lista = lista.filter(c => c.torre === filtroTorreActual);
+  if (soloConEstacionamiento) lista = lista.filter(c => c.estacionamiento && String(c.estacionamiento).trim());
   if (busqueda){
     lista = lista.filter(c => Object.values(c).some(v => String(v||'').toLowerCase().includes(busqueda)));
   }
@@ -764,9 +769,10 @@ function renderContactos(){
   if (!lista.length){ cont.innerHTML = '<p class="empty">No hay contactos que coincidan con la búsqueda.</p>'; return; }
 
   cont.innerHTML = `<p class="empty" style="margin-bottom:8px;">${lista.length} de ${cacheContactos.length} contactos</p>` +
-    '<table><tr><th>Nombre</th><th>Torre</th><th>Unidad</th><th>Tipo</th><th>Email</th><th></th></tr>' +
+    '<table><tr><th>Nombre</th><th>Torre</th><th>Unidad</th><th>Estacionamiento</th><th>Tipo</th><th>Email</th><th></th></tr>' +
     lista.map(c=>`<tr><td>${esc(c.nombre)}</td><td><span class="torre-tab ${String(c.torre).toLowerCase()}"></span>${esc(c.torre)}</td>
     <td class="mono">${esc(c.unidad)||'—'}</td>
+    <td class="mono">${esc(c.estacionamiento)||'—'}</td>
     <td><span class="badge ${c.tipo}">${c.tipo==='propietario'?'Propietario':'Arrendatario'}</span></td>
     <td class="mono">${esc(c.email)}</td>
     <td>
