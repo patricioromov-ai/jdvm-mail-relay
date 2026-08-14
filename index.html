@@ -481,7 +481,7 @@
       <div class="topline"><div><h2>Control de Mudanzas</h2><p>Ingreso y salida — con checklist de aprobación y validación automática de horario</p></div></div>
 
       <div class="card">
-        <p class="empty"><b>Reglas de horario:</b> lunes a viernes 10:00–18:00, sábado 10:00–14:00. Domingos y festivos no disponibles. No se permiten dos mudanzas en la misma torre con menos de 2 horas de separación.</p>
+        <p class="empty"><b>Reglas de horario:</b> lunes a viernes 10:00–18:00, sábado 10:00–14:00. Domingos y festivos no disponibles. Cada mudanza reserva una ventana de 2 horas; no puede haber dos mudanzas superpuestas en la misma torre (pero sí seguidas, ej. 10:00-12:00 y 12:00-14:00).</p>
       </div>
 
       <div class="card">
@@ -552,7 +552,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [];
