@@ -510,6 +510,15 @@
       </div>
 
       <div class="card">
+        <h3>Imprimir consolidado</h3>
+        <div class="form-grid">
+          <div class="form-row"><label>Desde</label><input type="date" id="mud-print-fecha-inicio"></div>
+          <div class="form-row"><label>Hasta</label><input type="date" id="mud-print-fecha-fin"></div>
+        </div>
+        <button class="icon-btn" onclick="imprimirMudanzas()">🖨 Imprimir rango</button>
+      </div>
+
+      <div class="card">
         <h3>Mudanzas agendadas</h3>
         <div id="tabla-mudanzas"><p class="empty">Cargando...</p></div>
       </div>
@@ -552,7 +561,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [];
@@ -1898,6 +1907,60 @@ function renderMudanzas(){
     return `<h3 style="font-size:0.95rem;margin:16px 0 8px;">${formatearFechaSolo(fecha)}</h3>
       <table><tr><th>Horario</th><th>Torre/Unidad</th><th>Tipo</th><th>Responsable</th><th>Aprobaciones</th><th></th></tr>${filas}</table>`;
   }).join('');
+}
+
+function imprimirMudanzas(){
+  const desde = document.getElementById('mud-print-fecha-inicio').value;
+  const hasta = document.getElementById('mud-print-fecha-fin').value;
+  if (!desde || !hasta) return alert('Selecciona fecha de inicio y de término.');
+  if (hasta < desde) return alert('La fecha de término debe ser igual o posterior a la de inicio.');
+
+  let lista = cacheMudanzas.filter(m => m.estado !== 'cancelada' && m.fecha >= desde && m.fecha <= hasta);
+  lista = lista.sort((a,b) => (a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
+
+  const grupos = {};
+  lista.forEach(m=>{ (grupos[m.fecha] = grupos[m.fecha] || []).push(m); });
+
+  const nombreEdificio = 'Comunidad Jardines de Vicuña Mackenna';
+  let cuerpo = '';
+  if (!lista.length){
+    cuerpo = '<p>Sin mudanzas agendadas en este rango de fechas.</p>';
+  } else {
+    cuerpo = Object.keys(grupos).sort().map(fecha=>{
+      const filas = grupos[fecha].map(m=>`<tr>
+        <td>${esc(m.horaInicio)}–${esc(m.horaTermino)}</td>
+        <td>Torre ${esc(m.torre)} / ${esc(m.unidad)}</td>
+        <td>${m.tipo==='ingreso'?'Ingreso':'Salida'}</td>
+        <td>${esc(m.nombreResponsable)}${m.telefonoResponsable ? '<br>'+esc(m.telefonoResponsable) : ''}</td>
+        <td>${esc(m.vehiculoTipo)||'-'}${m.vehiculoPatente ? ' / '+esc(m.vehiculoPatente) : ''}</td>
+        <td>Admin: ${esc(m.aprobacionAdmin)}<br>Dueño: ${esc(m.aprobacionDueno)}</td>
+        <td>${esc(m.notas)||'—'}</td>
+      </tr>`).join('');
+      return `<h3>${formatearFechaSolo(fecha)}</h3>
+        <table><tr><th>Horario</th><th>Torre/Unidad</th><th>Tipo</th><th>Responsable</th><th>Vehículo</th><th>Aprobaciones</th><th>Notas</th></tr>${filas}</table>`;
+    }).join('');
+  }
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Consolidado de mudanzas</title>
+  <style>
+    body{font-family:Arial,sans-serif;color:#1F2A44;padding:24px;}
+    h1{font-size:1.3rem;margin-bottom:2px;}
+    .sub{color:#4A5568;font-size:0.9rem;margin-bottom:20px;}
+    h3{font-size:1rem;margin:18px 0 6px;border-bottom:1px solid #ccc;padding-bottom:4px;}
+    table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:0.82rem;}
+    th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;}
+    th{background:#F0EFEA;}
+    @media print{ body{padding:0;} }
+  </style></head><body>
+  <h1>${nombreEdificio} — Consolidado de Mudanzas</h1>
+  <p class="sub">Rango: ${desde} al ${hasta} · Generado el ${new Date().toLocaleDateString('es-CL')}</p>
+  ${cuerpo}
+  </body></html>`;
+
+  const ventana = window.open('', '_blank');
+  ventana.document.write(html);
+  ventana.document.close();
+  ventana.onload = () => ventana.print();
 }
 
 // ========= UTIL =========
