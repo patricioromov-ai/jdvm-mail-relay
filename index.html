@@ -55,6 +55,7 @@
   .badge.borrador{background:#EAEAE4;color:var(--pending);}
   .badge.enviando{background:#F2E8DA;color:var(--torre-c);}
   .badge.pausada{background:#F7E4E4;color:var(--torre-a);}
+  .badge.err{background:#F7E4E4;color:var(--err);}
   .badge.actualizacion{background:#E4EEE9;color:var(--torre-b);}
   .icon-btn{background:none;border:1px solid var(--line);border-radius:5px;padding:5px 9px;cursor:pointer;font-size:0.8rem;color:var(--ink-soft);}
   .icon-btn:hover{border-color:var(--ink-soft);color:var(--ink);}
@@ -109,6 +110,7 @@
       <div class="nav-item" data-view="encuestas"><span class="ic">◔</span> Encuestas</div>
       <div class="nav-item" data-view="seguimiento"><span class="ic">↗</span> Seguimiento</div>
       <div class="nav-item" data-view="reservas"><span class="ic">📅</span> Reservas</div>
+      <div class="nav-item" data-view="mudanzas"><span class="ic">🚚</span> Mudanzas</div>
       <div class="nav-item" data-view="config"><span class="ic">⚙</span> Configuración</div>
     </nav>
     <div class="foot">contacto@jdvm.cl</div>
@@ -474,6 +476,45 @@
       </div>
     </section>
 
+    <!-- MUDANZAS -->
+    <section class="view" id="view-mudanzas">
+      <div class="topline"><div><h2>Control de Mudanzas</h2><p>Ingreso y salida — con checklist de aprobación y validación automática de horario</p></div></div>
+
+      <div class="card">
+        <p class="empty"><b>Reglas de horario:</b> lunes a viernes 10:00–18:00, sábado 10:00–14:00. Domingos y festivos no disponibles. No se permiten dos mudanzas en la misma torre con menos de 2 horas de separación.</p>
+      </div>
+
+      <div class="card">
+        <h3 id="mud-form-titulo">Nueva mudanza</h3>
+        <input type="hidden" id="mud-id">
+        <div class="form-grid">
+          <div class="form-row"><label>Tipo</label>
+            <select id="mud-tipo"><option value="ingreso">Ingreso</option><option value="salida">Salida</option></select>
+          </div>
+          <div class="form-row"><label>Torre</label>
+            <select id="mud-torre"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+          </div>
+          <div class="form-row"><label>Unidad</label><input type="text" id="mud-unidad" placeholder="Ej. A-0501"></div>
+          <div class="form-row"><label>Fecha</label><input type="date" id="mud-fecha"></div>
+          <div class="form-row"><label>Hora inicio</label><input type="time" id="mud-hora-inicio" onchange="calcularHoraTermino()"></div>
+          <div class="form-row"><label>Hora término</label><input type="time" id="mud-hora-termino"></div>
+          <div class="form-row"><label>Nombre responsable</label><input type="text" id="mud-responsable"></div>
+          <div class="form-row"><label>Teléfono responsable</label><input type="text" id="mud-telefono"></div>
+          <div class="form-row"><label>Tipo de vehículo</label><input type="text" id="mud-vehiculo-tipo" placeholder="Ej. Camión 3/4"></div>
+          <div class="form-row"><label>Patente</label><input type="text" id="mud-vehiculo-patente"></div>
+        </div>
+        <div class="form-row"><div class="check-group"><label><input type="checkbox" id="mud-arrendatario"> El solicitante es arrendatario (requiere aprobación del propietario)</label></div></div>
+        <div class="form-row"><label>Notas</label><input type="text" id="mud-notas"></div>
+        <button class="btn-primary" onclick="guardarMudanza(this)">Guardar mudanza</button>
+        <button class="icon-btn" onclick="cancelarEdicionMudanza()">Cancelar</button>
+      </div>
+
+      <div class="card">
+        <h3>Mudanzas agendadas</h3>
+        <div id="tabla-mudanzas"><p class="empty">Cargando...</p></div>
+      </div>
+    </section>
+
     <!-- CONFIGURACIÓN -->
     <section class="view" id="view-config">
       <div class="topline"><div><h2>Configuración</h2><p>Logo y firma — se aplican automáticamente a todos los correos</p></div></div>
@@ -486,6 +527,11 @@
         <div class="form-row">
           <label>Firma (HTML) — se agrega al final de cada correo automáticamente</label>
           <textarea id="cfg-firma" placeholder="Ej: &lt;p&gt;Comunidad Jardines de Vicuña Mackenna&lt;br&gt;contacto@jdvm.cl&lt;/p&gt;"></textarea>
+        </div>
+        <div class="form-row">
+          <label>Festivos para Mudanzas (fechas separadas por coma, formato AAAA-MM-DD)</label>
+          <input type="text" id="cfg-festivos" placeholder="2026-09-18, 2026-09-19, 2026-12-25">
+          <p class="empty" style="margin-top:6px;">En esas fechas no se van a poder agendar mudanzas, sin importar el día de la semana.</p>
         </div>
         <button class="btn-primary" onclick="guardarConfig(this)">Guardar configuración</button>
         <span id="cfg-msg" class="tag" style="margin-left:10px;display:none;"></span>
@@ -506,10 +552,10 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
-let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [];
+let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [];
 let campanaTipoSeleccionado = 'comunicado';
 
 if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
@@ -595,11 +641,11 @@ function toggleForm(id){
 // ========= CARGA INICIAL =========
 async function cargarTodo(){
   try{
-    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas] = await Promise.all([
-      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas')
+    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas, cacheMudanzas] = await Promise.all([
+      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas'), api('listMudanzas')
     ]);
     renderPanel(); renderContactos(); renderExternos(); renderPlantillas();
-    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas();
+    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas(); renderMudanzas();
   }catch(e){ /* el error ya se muestra en el banner */ }
 }
 cargarTodo();
@@ -1135,13 +1181,15 @@ function renderConfig(){
     logoImg.src = cacheConfig.logoUrl; logoImg.style.display = 'block';
     previewImg.src = cacheConfig.logoUrl; previewImg.style.display = 'block';
   }
+  document.getElementById('cfg-festivos').value = cacheConfig.festivosMudanza || '';
 }
 async function guardarConfig(boton){
   if (!iniciarCarga(boton)) return;
   try{
     const payload = {
       logoUrl: document.getElementById('cfg-logo').value,
-      firmaHtml: document.getElementById('cfg-firma').value
+      firmaHtml: document.getElementById('cfg-firma').value,
+      festivosMudanza: document.getElementById('cfg-festivos').value
     };
     cacheConfig = await api('setConfig', payload);
     renderConfig();
@@ -1717,6 +1765,139 @@ function imprimirReservas(){
   ventana.document.write(html);
   ventana.document.close();
   ventana.onload = () => ventana.print();
+}
+
+// ========= MUDANZAS =========
+function calcularHoraTermino(){
+  const inicio = document.getElementById('mud-hora-inicio').value;
+  if (!inicio) return;
+  const [h,m] = inicio.split(':').map(Number);
+  const total = h*60 + m + 120;
+  const hh = String(Math.floor(total/60)%24).padStart(2,'0');
+  const mm = String(total%60).padStart(2,'0');
+  document.getElementById('mud-hora-termino').value = hh+':'+mm;
+}
+function limpiarFormularioMudanza(){
+  document.getElementById('mud-id').value = '';
+  document.getElementById('mud-tipo').value = 'ingreso';
+  document.getElementById('mud-torre').value = 'A';
+  document.getElementById('mud-unidad').value = '';
+  document.getElementById('mud-fecha').value = '';
+  document.getElementById('mud-hora-inicio').value = '';
+  document.getElementById('mud-hora-termino').value = '';
+  document.getElementById('mud-responsable').value = '';
+  document.getElementById('mud-telefono').value = '';
+  document.getElementById('mud-vehiculo-tipo').value = '';
+  document.getElementById('mud-vehiculo-patente').value = '';
+  document.getElementById('mud-arrendatario').checked = false;
+  document.getElementById('mud-notas').value = '';
+  document.getElementById('mud-form-titulo').textContent = 'Nueva mudanza';
+}
+function cancelarEdicionMudanza(){ limpiarFormularioMudanza(); }
+function editarMudanza(id){
+  const m = cacheMudanzas.find(x=>String(x.id)===String(id));
+  if (!m) return;
+  document.getElementById('mud-id').value = m.id;
+  document.getElementById('mud-tipo').value = m.tipo;
+  document.getElementById('mud-torre').value = m.torre;
+  document.getElementById('mud-unidad').value = m.unidad;
+  document.getElementById('mud-fecha').value = m.fecha;
+  document.getElementById('mud-hora-inicio').value = m.horaInicio;
+  document.getElementById('mud-hora-termino').value = m.horaTermino;
+  document.getElementById('mud-responsable').value = m.nombreResponsable;
+  document.getElementById('mud-telefono').value = m.telefonoResponsable;
+  document.getElementById('mud-vehiculo-tipo').value = m.vehiculoTipo;
+  document.getElementById('mud-vehiculo-patente').value = m.vehiculoPatente;
+  document.getElementById('mud-arrendatario').checked = m.esArrendatario === 'si';
+  document.getElementById('mud-notas').value = m.notas;
+  document.getElementById('mud-form-titulo').textContent = 'Editar mudanza';
+  document.querySelector('#view-mudanzas .card:nth-child(2)').scrollIntoView({behavior:'smooth'});
+}
+async function guardarMudanza(boton){
+  if (!iniciarCarga(boton)) return;
+  const id = document.getElementById('mud-id').value;
+  const payload = {
+    tipo: document.getElementById('mud-tipo').value,
+    torre: document.getElementById('mud-torre').value,
+    unidad: document.getElementById('mud-unidad').value,
+    fecha: document.getElementById('mud-fecha').value,
+    horaInicio: document.getElementById('mud-hora-inicio').value,
+    horaTermino: document.getElementById('mud-hora-termino').value,
+    nombreResponsable: document.getElementById('mud-responsable').value,
+    telefonoResponsable: document.getElementById('mud-telefono').value,
+    vehiculoTipo: document.getElementById('mud-vehiculo-tipo').value,
+    vehiculoPatente: document.getElementById('mud-vehiculo-patente').value,
+    esArrendatario: document.getElementById('mud-arrendatario').checked ? 'si' : 'no',
+    notas: document.getElementById('mud-notas').value
+  };
+  if (!payload.unidad || !payload.fecha || !payload.horaInicio || !payload.horaTermino || !payload.nombreResponsable){
+    finCarga(boton); return alert('Completa unidad, fecha, horario y nombre del responsable.');
+  }
+  try{
+    if (id){ payload.id = id; await api('updateMudanza', payload); }
+    else { await api('addMudanza', payload); }
+    limpiarFormularioMudanza();
+    await cargarTodo();
+  }catch(e){ /* el conflicto/horario inválido ya se muestra en el banner */ }
+  finally{ finCarga(boton, '✔ Guardado'); }
+}
+async function eliminarMudanza(id){
+  if (!confirm('¿Cancelar esta mudanza?')) return;
+  await api('updateMudanza', { id, estado: 'cancelada' });
+  await cargarTodo();
+}
+async function aprobarMudanza(id, campo, valor){
+  await api('updateMudanza', { id, [campo]: valor });
+  await cargarTodo();
+}
+async function generarPdfMudanzaBtn(id){
+  try{
+    const r = await api('generarPdfMudanza', { id });
+    window.open(r.url, '_blank');
+    await cargarTodo();
+  }catch(e){}
+}
+async function enviarMudanzaCorreoBtn(id){
+  const destinatarios = prompt('¿A qué correo(s) enviar el PDF? (separa con coma si son varios)');
+  if (!destinatarios) return;
+  try{
+    const r = await api('enviarMudanzaPorCorreo', { id, destinatarios });
+    alert(`✔ Enviado a ${r.enviados} de ${r.total} destinatario(s).`);
+    await cargarTodo();
+  }catch(e){}
+}
+function renderMudanzas(){
+  const cont = document.getElementById('tabla-mudanzas');
+  const lista = cacheMudanzas.filter(m=>m.estado!=='cancelada').sort((a,b)=>(a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin mudanzas agendadas.</p>'; return; }
+
+  const grupos = {};
+  lista.forEach(m=>{ (grupos[m.fecha] = grupos[m.fecha] || []).push(m); });
+
+  const chip = (v) => {
+    const clase = v==='aprobado' ? 'enviada' : v==='rechazado' ? 'err' : v==='no_aplica' ? 'borrador' : 'programada';
+    return `<span class="badge ${clase}">${esc(v)}</span>`;
+  };
+
+  cont.innerHTML = Object.keys(grupos).sort().map(fecha=>{
+    const filas = grupos[fecha].map(m=>`<tr>
+      <td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}</td>
+      <td><span class="torre-tab ${String(m.torre).toLowerCase()}"></span>${esc(m.torre)} / ${esc(m.unidad)}</td>
+      <td>${m.tipo==='ingreso'?'Ingreso':'Salida'}</td>
+      <td>${esc(m.nombreResponsable)}${m.vehiculoPatente ? '<br><span class="mono" style="color:var(--pending);">'+esc(m.vehiculoPatente)+'</span>' : ''}</td>
+      <td>Admin: ${chip(m.aprobacionAdmin)}<br>Dueño: ${chip(m.aprobacionDueno)}</td>
+      <td>
+        ${m.aprobacionAdmin!=='aprobado' ? `<button class="icon-btn" onclick="aprobarMudanza(${m.id},'aprobacionAdmin','aprobado')">Aprobar admin</button>` : ''}
+        ${m.esArrendatario==='si' && m.aprobacionDueno!=='aprobado' ? `<button class="icon-btn" onclick="aprobarMudanza(${m.id},'aprobacionDueno','aprobado')">Aprobar dueño</button>` : ''}
+        <button class="icon-btn" onclick="generarPdfMudanzaBtn(${m.id})">📄 PDF</button>
+        <button class="icon-btn" onclick="enviarMudanzaCorreoBtn(${m.id})">Enviar correo</button>
+        <button class="icon-btn" onclick="editarMudanza(${m.id})">Editar</button>
+        <button class="icon-btn" onclick="eliminarMudanza(${m.id})">Cancelar</button>
+      </td>
+    </tr>`).join('');
+    return `<h3 style="font-size:0.95rem;margin:16px 0 8px;">${formatearFechaSolo(fecha)}</h3>
+      <table><tr><th>Horario</th><th>Torre/Unidad</th><th>Tipo</th><th>Responsable</th><th>Aprobaciones</th><th></th></tr>${filas}</table>`;
+  }).join('');
 }
 
 // ========= UTIL =========
