@@ -504,6 +504,7 @@
           <div class="form-row"><label>Patente</label><input type="text" id="mud-vehiculo-patente"></div>
         </div>
         <div class="form-row"><div class="check-group"><label><input type="checkbox" id="mud-arrendatario"> El solicitante es arrendatario (requiere aprobación del propietario)</label></div></div>
+        <div class="form-row"><div class="check-group"><label><input type="checkbox" id="mud-excepcion"> Autorizar fuera del horario habitual (excepción — requiere justificar en notas)</label></div></div>
         <div class="form-row"><label>Notas</label><input type="text" id="mud-notas"></div>
         <button class="btn-primary" onclick="guardarMudanza(this)">Guardar mudanza</button>
         <button class="icon-btn" onclick="cancelarEdicionMudanza()">Cancelar</button>
@@ -561,7 +562,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [];
@@ -1799,6 +1800,7 @@ function limpiarFormularioMudanza(){
   document.getElementById('mud-vehiculo-tipo').value = '';
   document.getElementById('mud-vehiculo-patente').value = '';
   document.getElementById('mud-arrendatario').checked = false;
+  document.getElementById('mud-excepcion').checked = false;
   document.getElementById('mud-notas').value = '';
   document.getElementById('mud-form-titulo').textContent = 'Nueva mudanza';
 }
@@ -1818,6 +1820,7 @@ function editarMudanza(id){
   document.getElementById('mud-vehiculo-tipo').value = m.vehiculoTipo;
   document.getElementById('mud-vehiculo-patente').value = m.vehiculoPatente;
   document.getElementById('mud-arrendatario').checked = m.esArrendatario === 'si';
+  document.getElementById('mud-excepcion').checked = m.excepcionHorario === 'si';
   document.getElementById('mud-notas').value = m.notas;
   document.getElementById('mud-form-titulo').textContent = 'Editar mudanza';
   document.querySelector('#view-mudanzas .card:nth-child(2)').scrollIntoView({behavior:'smooth'});
@@ -1837,10 +1840,14 @@ async function guardarMudanza(boton){
     vehiculoTipo: document.getElementById('mud-vehiculo-tipo').value,
     vehiculoPatente: document.getElementById('mud-vehiculo-patente').value,
     esArrendatario: document.getElementById('mud-arrendatario').checked ? 'si' : 'no',
+    excepcionHorario: document.getElementById('mud-excepcion').checked ? 'si' : 'no',
     notas: document.getElementById('mud-notas').value
   };
   if (!payload.unidad || !payload.fecha || !payload.horaInicio || !payload.horaTermino || !payload.nombreResponsable){
     finCarga(boton); return alert('Completa unidad, fecha, horario y nombre del responsable.');
+  }
+  if (payload.excepcionHorario === 'si' && !payload.notas.trim()){
+    finCarga(boton); return alert('Si autorizas una excepción de horario, debes justificarla en el campo Notas.');
   }
   try{
     if (id){ payload.id = id; await api('updateMudanza', payload); }
@@ -1890,7 +1897,7 @@ function renderMudanzas(){
 
   cont.innerHTML = Object.keys(grupos).sort().map(fecha=>{
     const filas = grupos[fecha].map(m=>`<tr>
-      <td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}</td>
+      <td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}${m.excepcionHorario==='si' ? '<br><span class="badge borrador" title="Fuera del horario habitual">⚠ Excepción</span>' : ''}</td>
       <td><span class="torre-tab ${String(m.torre).toLowerCase()}"></span>${esc(m.torre)} / ${esc(m.unidad)}</td>
       <td>${m.tipo==='ingreso'?'Ingreso':'Salida'}</td>
       <td>${esc(m.nombreResponsable)}${m.vehiculoPatente ? '<br><span class="mono" style="color:var(--pending);">'+esc(m.vehiculoPatente)+'</span>' : ''}</td>
