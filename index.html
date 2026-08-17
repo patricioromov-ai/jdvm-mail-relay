@@ -416,11 +416,34 @@
         <div class="form-grid">
           <div class="form-row"><label>Espacio</label>
             <select id="res-espacio" onchange="document.getElementById('res-espacio-otro').style.display = this.value==='Otro' ? 'block':'none';">
-              <option>Quincho</option>
-              <option>Salón de Eventos</option>
-              <option>Sala Multiuso</option>
-              <option>Ascensor de Carga (Mudanza)</option>
-              <option>Piscina</option>
+              <optgroup label="Torre A">
+                <option>Quincho 1 Torre A</option>
+                <option>Quincho 2 Torre A</option>
+                <option>Salón de Eventos Torre A</option>
+                <option>Sala Multiuso Torre A</option>
+              </optgroup>
+              <optgroup label="Torre B">
+                <option>Quincho 1 Torre B</option>
+                <option>Quincho 2 Torre B</option>
+                <option>Salón de Eventos Torre B</option>
+                <option>Sala Multiuso Torre B</option>
+              </optgroup>
+              <optgroup label="Torre C">
+                <option>Quincho 1 Torre C</option>
+                <option>Quincho 2 Torre C</option>
+                <option>Salón de Eventos Torre C</option>
+                <option>Sala Multiuso Torre C</option>
+              </optgroup>
+              <optgroup label="Torre D">
+                <option>Quincho 1 Torre D</option>
+                <option>Quincho 2 Torre D</option>
+                <option>Salón de Eventos Torre D</option>
+                <option>Sala Multiuso Torre D</option>
+              </optgroup>
+              <optgroup label="Comunes">
+                <option>Piscina</option>
+                <option>Ascensor de Carga (Mudanza)</option>
+              </optgroup>
               <option value="Otro">Otro (especificar)</option>
             </select>
             <input type="text" id="res-espacio-otro" placeholder="Nombre del espacio" style="display:none;margin-top:8px;">
@@ -450,11 +473,34 @@
           <div class="form-row"><label>Espacio</label>
             <select id="res-filtro-espacio" onchange="renderReservas()">
               <option value="">Todos</option>
-              <option>Quincho</option>
-              <option>Salón de Eventos</option>
-              <option>Sala Multiuso</option>
-              <option>Ascensor de Carga (Mudanza)</option>
-              <option>Piscina</option>
+              <optgroup label="Torre A">
+                <option>Quincho 1 Torre A</option>
+                <option>Quincho 2 Torre A</option>
+                <option>Salón de Eventos Torre A</option>
+                <option>Sala Multiuso Torre A</option>
+              </optgroup>
+              <optgroup label="Torre B">
+                <option>Quincho 1 Torre B</option>
+                <option>Quincho 2 Torre B</option>
+                <option>Salón de Eventos Torre B</option>
+                <option>Sala Multiuso Torre B</option>
+              </optgroup>
+              <optgroup label="Torre C">
+                <option>Quincho 1 Torre C</option>
+                <option>Quincho 2 Torre C</option>
+                <option>Salón de Eventos Torre C</option>
+                <option>Sala Multiuso Torre C</option>
+              </optgroup>
+              <optgroup label="Torre D">
+                <option>Quincho 1 Torre D</option>
+                <option>Quincho 2 Torre D</option>
+                <option>Salón de Eventos Torre D</option>
+                <option>Sala Multiuso Torre D</option>
+              </optgroup>
+              <optgroup label="Comunes">
+                <option>Piscina</option>
+                <option>Ascensor de Carga (Mudanza)</option>
+              </optgroup>
             </select>
           </div>
           <div class="form-row"><label>Desde fecha</label><input type="date" id="res-filtro-fecha" onchange="renderReservas()"></div>
@@ -562,7 +608,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [];
@@ -1671,7 +1717,11 @@ function editarReserva(id){
   const r = cacheReservas.find(x=>String(x.id)===String(id));
   if (!r) return;
   document.getElementById('res-id').value = r.id;
-  const espacios = ['Quincho','Salón de Eventos','Sala Multiuso','Ascensor de Carga (Mudanza)','Piscina'];
+  const espacios = [];
+  ['A','B','C','D'].forEach(t=>{
+    espacios.push('Quincho 1 Torre '+t, 'Quincho 2 Torre '+t, 'Salón de Eventos Torre '+t, 'Sala Multiuso Torre '+t);
+  });
+  espacios.push('Piscina', 'Ascensor de Carga (Mudanza)');
   if (espacios.includes(r.espacio)){
     document.getElementById('res-espacio').value = r.espacio;
     document.getElementById('res-espacio-otro').style.display = 'none';
