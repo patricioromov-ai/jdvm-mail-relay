@@ -569,6 +569,11 @@
         <h3>Mudanzas agendadas</h3>
         <div id="tabla-mudanzas"><p class="empty">Cargando...</p></div>
       </div>
+
+      <div class="card">
+        <button class="icon-btn" onclick="toggleHistorialMudanzas()">Ver historial (realizadas / canceladas)</button>
+        <div id="historial-mudanzas" style="display:none;margin-top:14px;"></div>
+      </div>
     </section>
 
     <!-- CONFIGURACIÓN -->
@@ -608,7 +613,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [];
@@ -1907,6 +1912,31 @@ async function guardarMudanza(boton){
   }catch(e){ /* el conflicto/horario inválido ya se muestra en el banner */ }
   finally{ finCarga(boton, '✔ Guardado'); }
 }
+function toggleHistorialMudanzas(){
+  const cont = document.getElementById('historial-mudanzas');
+  if (cont.style.display === 'none'){
+    cont.style.display = 'block';
+    renderHistorialMudanzas();
+  } else {
+    cont.style.display = 'none';
+  }
+}
+function renderHistorialMudanzas(){
+  const cont = document.getElementById('historial-mudanzas');
+  const lista = cacheMudanzas.filter(m=>m.estado==='realizada' || m.estado==='cancelada')
+    .sort((a,b)=>(b.fecha+b.horaInicio).localeCompare(a.fecha+a.horaInicio)); // más reciente primero
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin mudanzas en el historial todavía.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Fecha</th><th>Horario</th><th>Torre/Unidad</th><th>Tipo</th><th>Responsable</th><th>Estado</th></tr>' +
+    lista.map(m=>`<tr><td class="mono">${esc(m.fecha)}</td><td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}</td>
+    <td><span class="torre-tab ${String(m.torre).toLowerCase()}"></span>${esc(m.torre)} / ${esc(m.unidad)}</td>
+    <td>${m.tipo==='ingreso'?'Ingreso':'Salida'}</td><td>${esc(m.nombreResponsable)}</td>
+    <td><span class="badge ${m.estado==='realizada'?'enviada':'borrador'}">${esc(m.estado)}</span></td></tr>`).join('') + '</table>';
+}
+async function marcarMudanzaRealizada(id){
+  if (!confirm('¿Marcar esta mudanza como realizada? Se saca de la lista activa y queda en el historial.')) return;
+  await api('updateMudanza', { id, estado: 'realizada' });
+  await cargarTodo();
+}
 async function eliminarMudanza(id){
   if (!confirm('¿Cancelar esta mudanza?')) return;
   await api('updateMudanza', { id, estado: 'cancelada' });
@@ -1934,7 +1964,7 @@ async function enviarMudanzaCorreoBtn(id){
 }
 function renderMudanzas(){
   const cont = document.getElementById('tabla-mudanzas');
-  const lista = cacheMudanzas.filter(m=>m.estado!=='cancelada').sort((a,b)=>(a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
+  const lista = cacheMudanzas.filter(m=>m.estado!=='cancelada' && m.estado!=='realizada').sort((a,b)=>(a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
   if (!lista.length){ cont.innerHTML = '<p class="empty">Sin mudanzas agendadas.</p>'; return; }
 
   const grupos = {};
@@ -1958,12 +1988,15 @@ function renderMudanzas(){
         <button class="icon-btn" onclick="generarPdfMudanzaBtn(${m.id})">📄 PDF</button>
         <button class="icon-btn" onclick="enviarMudanzaCorreoBtn(${m.id})">Enviar correo</button>
         <button class="icon-btn" onclick="editarMudanza(${m.id})">Editar</button>
+        <button class="icon-btn" onclick="marcarMudanzaRealizada(${m.id})">✔ Realizada</button>
         <button class="icon-btn" onclick="eliminarMudanza(${m.id})">Cancelar</button>
       </td>
     </tr>`).join('');
     return `<h3 style="font-size:0.95rem;margin:16px 0 8px;">${formatearFechaSolo(fecha)}</h3>
       <table><tr><th>Horario</th><th>Torre/Unidad</th><th>Tipo</th><th>Responsable</th><th>Aprobaciones</th><th></th></tr>${filas}</table>`;
   }).join('');
+  const historial = document.getElementById('historial-mudanzas');
+  if (historial && historial.style.display !== 'none') renderHistorialMudanzas();
 }
 
 function imprimirMudanzas(){
