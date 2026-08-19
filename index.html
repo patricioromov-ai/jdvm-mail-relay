@@ -636,6 +636,13 @@
         </div>
 
         <div class="card">
+          <h3>Consolidado</h3>
+          <div class="check-group" style="margin-bottom:12px;"><label><input type="checkbox" id="tar-consolidado-historial"> Incluir historial (completadas/rechazadas)</label></div>
+          <button class="icon-btn" onclick="generarPdfConsolidadoBtn()">🖨 Generar / Imprimir PDF</button>
+          <button class="icon-btn" onclick="enviarConsolidadoCorreoBtn()">📧 Enviar por correo</button>
+        </div>
+
+        <div class="card">
           <h3>Solicitudes activas</h3>
           <div id="tabla-tarjetas"><p class="empty">Cargando...</p></div>
         </div>
@@ -702,7 +709,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [], cacheTarjetas = [], cachePersonalEquipos = [];
@@ -2282,6 +2289,23 @@ function renderHistorialTarjetas(){
     lista.map(t=>`<tr><td>${esc(t.torre)||''} ${esc(t.depto)||'—'}</td><td>${esc(t.nombre)}</td><td>${esc(t.motivo)}</td>
     <td>${badgeEstadoTarjeta(t.estado)}</td>
     <td class="mono">${esc(t.entregadoPor)||'—'}</td><td class="mono">${esc(t.recepcionadoPor)||'—'}</td></tr>`).join('') + '</table>';
+}
+
+async function generarPdfConsolidadoBtn(){
+  const incluirHistorial = document.getElementById('tar-consolidado-historial').checked;
+  try{
+    const r = await api('generarPdfConsolidadoTarjetas', { incluirHistorial });
+    window.open(r.url, '_blank');
+  }catch(e){}
+}
+async function enviarConsolidadoCorreoBtn(){
+  const incluirHistorial = document.getElementById('tar-consolidado-historial').checked;
+  const destinatarios = prompt('¿A qué correo(s) enviar el consolidado? (separa con coma si son varios)');
+  if (!destinatarios) return;
+  try{
+    const r = await api('enviarConsolidadoTarjetasPorCorreo', { destinatarios, incluirHistorial });
+    alert(`✔ Enviado a ${r.enviados} de ${r.total} destinatario(s).`);
+  }catch(e){}
 }
 
 // ========= PERSONAL CON EQUIPO =========
