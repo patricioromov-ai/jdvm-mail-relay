@@ -111,6 +111,7 @@
       <div class="nav-item" data-view="seguimiento"><span class="ic">↗</span> Seguimiento</div>
       <div class="nav-item" data-view="reservas"><span class="ic">📅</span> Reservas</div>
       <div class="nav-item" data-view="mudanzas"><span class="ic">🚚</span> Mudanzas</div>
+      <div class="nav-item" data-view="tarjetas"><span class="ic">🪪</span> Tarjetas Acceso</div>
       <div class="nav-item" data-view="config"><span class="ic">⚙</span> Configuración</div>
     </nav>
     <div class="foot">contacto@jdvm.cl</div>
@@ -576,6 +577,94 @@
       </div>
     </section>
 
+    <!-- TARJETAS DE ACCESO -->
+    <section class="view" id="view-tarjetas">
+      <div class="topline"><div><h2>Tarjetas de Acceso</h2><p>Solicitudes, checklist de entrega/recepción e historial</p></div></div>
+
+      <div class="subtabs" style="margin-bottom:14px;">
+        <div class="subtab active" data-sub-tarjetas="solicitudes" onclick="cambiarSubTarjetas('solicitudes', this)">Solicitudes</div>
+        <div class="subtab" data-sub-tarjetas="personal" onclick="cambiarSubTarjetas('personal', this)">Personal con equipo</div>
+      </div>
+
+      <div id="sub-tarjetas-solicitudes">
+        <div class="card">
+          <h3 id="tar-form-titulo">Nueva solicitud</h3>
+          <input type="hidden" id="tar-id">
+          <div class="form-grid">
+            <div class="form-row"><label>Tipo</label>
+              <select id="tar-tipo"><option value="residente">Residente</option><option value="personal">Personal / Funcionario</option></select>
+            </div>
+            <div class="form-row"><label>Torre</label>
+              <select id="tar-torre"><option value="">No aplica</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+            </div>
+            <div class="form-row"><label>Depto</label><input type="text" id="tar-depto"></div>
+            <div class="form-row"><label>Nombre</label><input type="text" id="tar-nombre"></div>
+            <div class="form-row"><label>Cantidad</label><input type="number" id="tar-cantidad" value="1" min="1"></div>
+            <div class="form-row"><label>Motivo</label>
+              <select id="tar-motivo">
+                <option>NUEVA TARJETA</option>
+                <option>REPOSICIÓN</option>
+                <option>ACTUALIZACIÓN DE DATOS</option>
+                <option>OTRO</option>
+              </select>
+            </div>
+            <div class="form-row"><label>Pagado</label>
+              <select id="tar-pagado"><option value="SI">Sí</option><option value="NO">No</option><option value="PENDIENTE">Pendiente</option></select>
+            </div>
+            <div class="form-row"><label>N° Serie (si corresponde)</label><input type="text" id="tar-serie"></div>
+          </div>
+          <div class="form-row"><label>Comentario</label><input type="text" id="tar-comentario"></div>
+          <button class="btn-primary" onclick="guardarTarjeta(this)">Guardar solicitud</button>
+          <button class="icon-btn" onclick="cancelarEdicionTarjeta()">Cancelar</button>
+        </div>
+
+        <div class="card">
+          <div class="form-grid">
+            <div class="form-row"><label>Filtrar por torre</label>
+              <select id="tar-filtro-torre" onchange="renderTarjetas()"><option value="">Todas</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+            </div>
+            <div class="form-row"><label>Filtrar por estado</label>
+              <select id="tar-filtro-estado" onchange="renderTarjetas()">
+                <option value="">Todos (activas)</option>
+                <option value="solicitada">Solicitada</option>
+                <option value="en_proceso">En proceso</option>
+                <option value="lista_entrega">Lista para entrega</option>
+                <option value="rechazada">Rechazada</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Solicitudes activas</h3>
+          <div id="tabla-tarjetas"><p class="empty">Cargando...</p></div>
+        </div>
+
+        <div class="card">
+          <button class="icon-btn" onclick="toggleHistorialTarjetas()">Ver historial (completadas / rechazadas)</button>
+          <div id="historial-tarjetas" style="display:none;margin-top:14px;"></div>
+        </div>
+      </div>
+
+      <div id="sub-tarjetas-personal" style="display:none;">
+        <div class="card">
+          <h3 id="pe-form-titulo">Nuevo registro de personal</h3>
+          <input type="hidden" id="pe-id">
+          <div class="form-grid">
+            <div class="form-row"><label>Nombre</label><input type="text" id="pe-nombre"></div>
+            <div class="form-row"><label>Cargo</label><input type="text" id="pe-cargo" placeholder="Ej. Conserjería Torre A"></div>
+            <div class="form-row"><label>N° Serie Equipo</label><input type="text" id="pe-serie"></div>
+          </div>
+          <button class="btn-primary" onclick="guardarPersonalEquipo(this)">Guardar</button>
+          <button class="icon-btn" onclick="cancelarEdicionPersonalEquipo()">Cancelar</button>
+        </div>
+        <div class="card">
+          <h3>Personal con equipo asignado</h3>
+          <div id="tabla-personal-equipos"><p class="empty">Cargando...</p></div>
+        </div>
+      </div>
+    </section>
+
     <!-- CONFIGURACIÓN -->
     <section class="view" id="view-config">
       <div class="topline"><div><h2>Configuración</h2><p>Logo y firma — se aplican automáticamente a todos los correos</p></div></div>
@@ -613,10 +702,10 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
-let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [];
+let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [], cacheTarjetas = [], cachePersonalEquipos = [];
 let campanaTipoSeleccionado = 'comunicado';
 
 if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
@@ -702,11 +791,11 @@ function toggleForm(id){
 // ========= CARGA INICIAL =========
 async function cargarTodo(){
   try{
-    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas, cacheMudanzas] = await Promise.all([
-      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas'), api('listMudanzas')
+    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas, cacheMudanzas, cacheTarjetas, cachePersonalEquipos] = await Promise.all([
+      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas'), api('listMudanzas'), api('listTarjetas'), api('listPersonalEquipos')
     ]);
     renderPanel(); renderContactos(); renderExternos(); renderPlantillas();
-    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas(); renderMudanzas();
+    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas(); renderMudanzas(); renderTarjetas(); renderPersonalEquipos();
   }catch(e){ /* el error ya se muestra en el banner */ }
 }
 cargarTodo();
@@ -2051,6 +2140,196 @@ function imprimirMudanzas(){
   ventana.document.write(html);
   ventana.document.close();
   ventana.onload = () => ventana.print();
+}
+
+// ========= TARJETAS DE ACCESO =========
+function cambiarSubTarjetas(cual, elemento){
+  document.querySelectorAll('#view-tarjetas .subtab').forEach(t=>t.classList.remove('active'));
+  elemento.classList.add('active');
+  document.getElementById('sub-tarjetas-solicitudes').style.display = cual==='solicitudes' ? 'block':'none';
+  document.getElementById('sub-tarjetas-personal').style.display = cual==='personal' ? 'block':'none';
+}
+
+function limpiarFormularioTarjeta(){
+  document.getElementById('tar-id').value = '';
+  document.getElementById('tar-tipo').value = 'residente';
+  document.getElementById('tar-torre').value = '';
+  document.getElementById('tar-depto').value = '';
+  document.getElementById('tar-nombre').value = '';
+  document.getElementById('tar-cantidad').value = '1';
+  document.getElementById('tar-motivo').value = 'NUEVA TARJETA';
+  document.getElementById('tar-pagado').value = 'SI';
+  document.getElementById('tar-serie').value = '';
+  document.getElementById('tar-comentario').value = '';
+  document.getElementById('tar-form-titulo').textContent = 'Nueva solicitud';
+}
+function cancelarEdicionTarjeta(){ limpiarFormularioTarjeta(); }
+function editarTarjeta(id){
+  const t = cacheTarjetas.find(x=>String(x.id)===String(id));
+  if (!t) return;
+  document.getElementById('tar-id').value = t.id;
+  document.getElementById('tar-tipo').value = t.tipo;
+  document.getElementById('tar-torre').value = t.torre || '';
+  document.getElementById('tar-depto').value = t.depto;
+  document.getElementById('tar-nombre').value = t.nombre;
+  document.getElementById('tar-cantidad').value = t.cantidad || 1;
+  document.getElementById('tar-motivo').value = t.motivo;
+  document.getElementById('tar-pagado').value = t.pagado;
+  document.getElementById('tar-serie').value = t.numeroSerie;
+  document.getElementById('tar-comentario').value = t.comentario;
+  document.getElementById('tar-form-titulo').textContent = 'Editar solicitud';
+  document.querySelector('#sub-tarjetas-solicitudes .card').scrollIntoView({behavior:'smooth'});
+}
+async function guardarTarjeta(boton){
+  if (!iniciarCarga(boton)) return;
+  const id = document.getElementById('tar-id').value;
+  const payload = {
+    tipo: document.getElementById('tar-tipo').value,
+    torre: document.getElementById('tar-torre').value,
+    depto: document.getElementById('tar-depto').value,
+    nombre: document.getElementById('tar-nombre').value,
+    cantidad: document.getElementById('tar-cantidad').value,
+    motivo: document.getElementById('tar-motivo').value,
+    pagado: document.getElementById('tar-pagado').value,
+    numeroSerie: document.getElementById('tar-serie').value,
+    comentario: document.getElementById('tar-comentario').value,
+  };
+  if (!payload.nombre){ finCarga(boton); return alert('Escribe el nombre.'); }
+  try{
+    if (id){ payload.id = id; await api('updateTarjeta', payload); }
+    else { await api('addTarjeta', payload); }
+    limpiarFormularioTarjeta();
+    await cargarTodo();
+  } finally { finCarga(boton, '✔ Guardado'); }
+}
+async function eliminarTarjeta(id){
+  if (!confirm('¿Rechazar/cancelar esta solicitud?')) return;
+  await api('updateTarjeta', { id, estado: 'rechazada' });
+  await cargarTodo();
+}
+async function cambiarEstadoTarjeta(id, estado){
+  await api('updateTarjeta', { id, estado });
+  await cargarTodo();
+}
+async function confirmarEntregaTarjeta(id){
+  const quien = prompt('¿Quién entrega la tarjeta (nombre de administración/conserjería)?');
+  if (!quien) return;
+  await api('updateTarjeta', { id, entregadoPor: quien, entregadoFecha: new Date().toLocaleString('es-CL') });
+  await cargarTodo();
+}
+async function confirmarRecepcionTarjeta(id){
+  const quien = prompt('¿Quién recibe la tarjeta (nombre del residente)?');
+  if (!quien) return;
+  await api('updateTarjeta', { id, recepcionadoPor: quien, recepcionadoFecha: new Date().toLocaleString('es-CL') });
+  await cargarTodo();
+}
+async function generarPdfTarjetaBtn(id){
+  try{ const r = await api('generarPdfTarjeta', { id }); window.open(r.url, '_blank'); await cargarTodo(); }catch(e){}
+}
+async function enviarTarjetaCorreoBtn(id){
+  const destinatarios = prompt('¿A qué correo(s) enviar el PDF? (separa con coma si son varios)');
+  if (!destinatarios) return;
+  try{
+    const r = await api('enviarTarjetaPorCorreo', { id, destinatarios });
+    alert(`✔ Enviado a ${r.enviados} de ${r.total} destinatario(s).`);
+  }catch(e){}
+}
+function badgeEstadoTarjeta(estado){
+  const mapa = { solicitada:'programada', en_proceso:'borrador', lista_entrega:'enviando', completada:'enviada', rechazada:'err' };
+  return `<span class="badge ${mapa[estado]||'borrador'}">${esc(estado)}</span>`;
+}
+function renderTarjetas(){
+  const cont = document.getElementById('tabla-tarjetas');
+  const filtroTorre = document.getElementById('tar-filtro-torre')?.value || '';
+  const filtroEstado = document.getElementById('tar-filtro-estado')?.value || '';
+  let lista = cacheTarjetas.filter(t => t.estado!=='completada' && t.estado!=='rechazada');
+  if (filtroTorre) lista = lista.filter(t=>t.torre===filtroTorre);
+  if (filtroEstado) lista = lista.filter(t=>t.estado===filtroEstado);
+
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin solicitudes activas.</p>'; return; }
+
+  cont.innerHTML = '<table><tr><th>Torre/Depto</th><th>Nombre</th><th>Motivo</th><th>Pagado</th><th>Estado</th><th>Checklist</th><th></th></tr>' +
+    lista.map(t=>`<tr>
+      <td>${t.torre ? '<span class="torre-tab '+String(t.torre).toLowerCase()+'"></span>'+esc(t.torre)+' / ' : ''}${esc(t.depto)||'—'}</td>
+      <td>${esc(t.nombre)}${t.tipo==='personal' ? ' <span class="mono" style="color:var(--pending);">(personal)</span>' : ''}</td>
+      <td>${esc(t.motivo)}${t.comentario ? '<br><span class="mono" style="color:var(--pending);">'+esc(t.comentario)+'</span>' : ''}</td>
+      <td>${esc(t.pagado)}</td>
+      <td>${badgeEstadoTarjeta(t.estado)}</td>
+      <td>${t.entregadoPor ? '✔ Entregada ('+esc(t.entregadoPor)+')' : '☐ Sin entregar'}<br>${t.recepcionadoPor ? '✔ Recibida ('+esc(t.recepcionadoPor)+')' : '☐ Sin recepción'}</td>
+      <td>
+        ${!t.entregadoPor ? `<button class="icon-btn" onclick="confirmarEntregaTarjeta(${t.id})">Confirmar entrega</button>` : ''}
+        ${!t.recepcionadoPor ? `<button class="icon-btn" onclick="confirmarRecepcionTarjeta(${t.id})">Confirmar recepción</button>` : ''}
+        <button class="icon-btn" onclick="generarPdfTarjetaBtn(${t.id})">📄 PDF</button>
+        <button class="icon-btn" onclick="enviarTarjetaCorreoBtn(${t.id})">Enviar correo</button>
+        <button class="icon-btn" onclick="editarTarjeta(${t.id})">Editar</button>
+        <button class="icon-btn" onclick="eliminarTarjeta(${t.id})">Rechazar</button>
+      </td>
+    </tr>`).join('') + '</table>';
+
+  const historial = document.getElementById('historial-tarjetas');
+  if (historial && historial.style.display !== 'none') renderHistorialTarjetas();
+}
+function toggleHistorialTarjetas(){
+  const cont = document.getElementById('historial-tarjetas');
+  if (cont.style.display === 'none'){ cont.style.display = 'block'; renderHistorialTarjetas(); }
+  else { cont.style.display = 'none'; }
+}
+function renderHistorialTarjetas(){
+  const cont = document.getElementById('historial-tarjetas');
+  const lista = cacheTarjetas.filter(t=>t.estado==='completada' || t.estado==='rechazada');
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin registros en el historial todavía.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Torre/Depto</th><th>Nombre</th><th>Motivo</th><th>Estado</th><th>Entregada</th><th>Recibida</th></tr>' +
+    lista.map(t=>`<tr><td>${esc(t.torre)||''} ${esc(t.depto)||'—'}</td><td>${esc(t.nombre)}</td><td>${esc(t.motivo)}</td>
+    <td>${badgeEstadoTarjeta(t.estado)}</td>
+    <td class="mono">${esc(t.entregadoPor)||'—'}</td><td class="mono">${esc(t.recepcionadoPor)||'—'}</td></tr>`).join('') + '</table>';
+}
+
+// ========= PERSONAL CON EQUIPO =========
+function limpiarFormularioPersonalEquipo(){
+  document.getElementById('pe-id').value = '';
+  document.getElementById('pe-nombre').value = '';
+  document.getElementById('pe-cargo').value = '';
+  document.getElementById('pe-serie').value = '';
+  document.getElementById('pe-form-titulo').textContent = 'Nuevo registro de personal';
+}
+function cancelarEdicionPersonalEquipo(){ limpiarFormularioPersonalEquipo(); }
+function editarPersonalEquipo(id){
+  const p = cachePersonalEquipos.find(x=>String(x.id)===String(id));
+  if (!p) return;
+  document.getElementById('pe-id').value = p.id;
+  document.getElementById('pe-nombre').value = p.nombre;
+  document.getElementById('pe-cargo').value = p.cargo;
+  document.getElementById('pe-serie').value = p.numeroSerie;
+  document.getElementById('pe-form-titulo').textContent = 'Editar registro';
+}
+async function eliminarPersonalEquipo(id){
+  if (!confirm('¿Eliminar este registro?')) return;
+  await api('deletePersonalEquipo', { id });
+  await cargarTodo();
+}
+async function guardarPersonalEquipo(boton){
+  if (!iniciarCarga(boton)) return;
+  const id = document.getElementById('pe-id').value;
+  const payload = {
+    nombre: document.getElementById('pe-nombre').value,
+    cargo: document.getElementById('pe-cargo').value,
+    numeroSerie: document.getElementById('pe-serie').value,
+  };
+  if (!payload.cargo){ finCarga(boton); return alert('Escribe al menos el cargo.'); }
+  try{
+    if (id){ payload.id = id; await api('updatePersonalEquipo', payload); }
+    else { await api('addPersonalEquipo', payload); }
+    limpiarFormularioPersonalEquipo();
+    await cargarTodo();
+  } finally { finCarga(boton, '✔ Guardado'); }
+}
+function renderPersonalEquipos(){
+  const cont = document.getElementById('tabla-personal-equipos');
+  if (!cachePersonalEquipos.length){ cont.innerHTML = '<p class="empty">Sin registros aún.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Cargo</th><th>N° Serie</th><th></th></tr>' +
+    cachePersonalEquipos.map(p=>`<tr><td>${esc(p.nombre)||'—'}</td><td>${esc(p.cargo)}</td><td class="mono">${esc(p.numeroSerie)}</td>
+    <td><button class="icon-btn" onclick="editarPersonalEquipo(${p.id})">Editar</button>
+    <button class="icon-btn" onclick="eliminarPersonalEquipo(${p.id})">Eliminar</button></td></tr>`).join('') + '</table>';
 }
 
 // ========= UTIL =========
