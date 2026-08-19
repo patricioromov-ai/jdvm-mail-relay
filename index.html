@@ -709,7 +709,7 @@
 // No compartas esta clave en el chat ni en ningún lugar público.
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxU5pziMs4Idjrb69XSHb64sJ3-ep9rgDV0BFWnkFladPdJN1iQs-WiB-cqHF1rjRB4/exec',
-  API_SECRET: 'comunicacion_jdvm'
+  API_SECRET: 'PON_AQUI_TU_API_SECRET'
 };
 
 let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [], cacheTarjetas = [], cachePersonalEquipos = [];
@@ -2255,12 +2255,13 @@ function renderTarjetas(){
 
   if (!lista.length){ cont.innerHTML = '<p class="empty">Sin solicitudes activas.</p>'; return; }
 
-  cont.innerHTML = '<table><tr><th>Torre/Depto</th><th>Nombre</th><th>Motivo</th><th>Pagado</th><th>Estado</th><th>Checklist</th><th></th></tr>' +
+  cont.innerHTML = '<table><tr><th>Torre/Depto</th><th>Nombre</th><th>Motivo</th><th>Pagado</th><th>Fecha solicitud</th><th>Estado</th><th>Checklist</th><th></th></tr>' +
     lista.map(t=>`<tr>
       <td>${t.torre ? '<span class="torre-tab '+String(t.torre).toLowerCase()+'"></span>'+esc(t.torre)+' / ' : ''}${esc(t.depto)||'—'}</td>
       <td>${esc(t.nombre)}${t.tipo==='personal' ? ' <span class="mono" style="color:var(--pending);">(personal)</span>' : ''}</td>
       <td>${esc(t.motivo)}${t.comentario ? '<br><span class="mono" style="color:var(--pending);">'+esc(t.comentario)+'</span>' : ''}</td>
       <td>${esc(t.pagado)}</td>
+      <td class="mono">${esc(t.fechaSolicitud)||'—'}</td>
       <td>${badgeEstadoTarjeta(t.estado)}</td>
       <td>${t.entregadoPor ? '✔ Entregada ('+esc(t.entregadoPor)+')' : '☐ Sin entregar'}<br>${t.recepcionadoPor ? '✔ Recibida ('+esc(t.recepcionadoPor)+')' : '☐ Sin recepción'}</td>
       <td>
