@@ -466,6 +466,11 @@
         <h3>Próximas reservas</h3>
         <div id="tabla-reservas"><p class="empty">Cargando...</p></div>
       </div>
+
+      <div class="card">
+        <button class="icon-btn" onclick="toggleHistorialReservas()">Ver historial (realizadas / canceladas)</button>
+        <div id="historial-reservas" style="display:none;margin-top:14px;"></div>
+      </div>
     </section>
 
     <!-- MUDANZAS -->
@@ -1749,30 +1754,70 @@ function renderReservas(){
   const filtroEspacio = document.getElementById('res-filtro-espacio')?.value || '';
   const filtroFecha = document.getElementById('res-filtro-fecha')?.value || '';
 
-  let lista = cacheReservas.filter(r => r.estado !== 'cancelada');
+  let lista = cacheReservas.filter(r => r.estado !== 'cancelada' && r.estado !== 'realizada');
   if (filtroEspacio) lista = lista.filter(r => r.espacio === filtroEspacio);
   if (filtroFecha) lista = lista.filter(r => r.fecha >= filtroFecha);
   lista = lista.sort((a,b) => (a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
 
-  if (!lista.length){ cont.innerHTML = '<p class="empty">No hay reservas que coincidan.</p>'; return; }
+  const hoy = new Date().toISOString().slice(0,10);
+  const atrasadas = cacheReservas.filter(r => r.estado !== 'cancelada' && r.estado !== 'realizada' && r.fecha < hoy).length;
+  const avisoAtrasadas = atrasadas > 0
+    ? `<p class="empty" style="margin-bottom:10px;">${atrasadas} reserva(s) de fechas pasadas sin marcar. <button class="icon-btn" onclick="marcarAtrasadasRealizadas()">Marcar todas las atrasadas como realizadas</button></p>`
+    : '';
+
+  if (!lista.length){ cont.innerHTML = avisoAtrasadas + '<p class="empty">No hay reservas que coincidan.</p>'; renderHistorialReservasSiVisible(); return; }
 
   // agrupar por fecha para que se vea como agenda
   const grupos = {};
   lista.forEach(r=>{ (grupos[r.fecha] = grupos[r.fecha] || []).push(r); });
 
-  cont.innerHTML = Object.keys(grupos).sort().map(fecha=>{
+  cont.innerHTML = avisoAtrasadas + Object.keys(grupos).sort().map(fecha=>{
     const filas = grupos[fecha].map(r=>`<tr>
       <td class="mono">${esc(r.horaInicio)}–${esc(r.horaTermino)}</td>
       <td>${esc(r.espacio)}</td>
       <td>${esc(r.nombreSolicitante)}${r.unidad ? ' ('+esc(r.unidad)+')' : ''}</td>
       <td>${r.torre ? '<span class="torre-tab '+String(r.torre).toLowerCase()+'"></span>'+esc(r.torre) : '—'}</td>
       <td>${esc(r.notas)||'—'}</td>
-      <td><button class="icon-btn" onclick="editarReserva(${r.id})">Editar</button>
+      <td><button class="icon-btn" onclick="marcarReservaRealizada(${r.id})">✔ Realizada</button>
+      <button class="icon-btn" onclick="editarReserva(${r.id})">Editar</button>
       <button class="icon-btn" onclick="eliminarReserva(${r.id})">Cancelar</button></td>
     </tr>`).join('');
     return `<h3 style="font-size:0.95rem;margin:16px 0 8px;">${formatearFechaSolo(fecha)}</h3>
       <table><tr><th>Horario</th><th>Espacio</th><th>Solicitante</th><th>Torre</th><th>Notas</th><th></th></tr>${filas}</table>`;
   }).join('');
+  renderHistorialReservasSiVisible();
+}
+async function marcarReservaRealizada(id){
+  if (!confirm('¿Marcar esta reserva como realizada? Se saca de la lista activa y queda en el historial.')) return;
+  await api('updateReserva', { id, estado: 'realizada' });
+  await cargarTodo();
+}
+async function marcarAtrasadasRealizadas(){
+  const hoy = new Date().toISOString().slice(0,10);
+  const atrasadas = cacheReservas.filter(r => r.estado !== 'cancelada' && r.estado !== 'realizada' && r.fecha < hoy);
+  if (!atrasadas.length) return;
+  if (!confirm(`¿Marcar las ${atrasadas.length} reservas atrasadas como realizadas?`)) return;
+  for (const r of atrasadas) { await api('updateReserva', { id: r.id, estado: 'realizada' }); }
+  await cargarTodo();
+}
+function toggleHistorialReservas(){
+  const cont = document.getElementById('historial-reservas');
+  if (cont.style.display === 'none'){ cont.style.display = 'block'; renderHistorialReservas(); }
+  else { cont.style.display = 'none'; }
+}
+function renderHistorialReservasSiVisible(){
+  const cont = document.getElementById('historial-reservas');
+  if (cont && cont.style.display !== 'none') renderHistorialReservas();
+}
+function renderHistorialReservas(){
+  const cont = document.getElementById('historial-reservas');
+  const lista = cacheReservas.filter(r=>r.estado==='realizada' || r.estado==='cancelada')
+    .sort((a,b)=>(b.fecha+b.horaInicio).localeCompare(a.fecha+a.horaInicio));
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin reservas en el historial todavía.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Fecha</th><th>Horario</th><th>Espacio</th><th>Solicitante</th><th>Estado</th></tr>' +
+    lista.map(r=>`<tr><td class="mono">${esc(r.fecha)}</td><td class="mono">${esc(r.horaInicio)}–${esc(r.horaTermino)}</td>
+    <td>${esc(r.espacio)}</td><td>${esc(r.nombreSolicitante)}</td>
+    <td><span class="badge ${r.estado==='realizada'?'enviada':'borrador'}">${esc(r.estado)}</span></td></tr>`).join('') + '</table>';
 }
 function formatearFechaSolo(fechaYMD){
   const [y,m,d] = fechaYMD.split('-');
