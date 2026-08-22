@@ -56,6 +56,9 @@
   .badge.enviando{background:#F2E8DA;color:var(--torre-c);}
   .badge.pausada{background:#F7E4E4;color:var(--torre-a);}
   .badge.err{background:#F7E4E4;color:var(--err);}
+  .badge.nuevo{background:#F7E4E4;color:var(--torre-a);}
+  .badge.en_revision{background:#F2E8DA;color:var(--torre-c);}
+  .badge.respondido{background:#E4EEE9;color:var(--torre-b);}
   .badge.actualizacion{background:#E4EEE9;color:var(--torre-b);}
   .icon-btn{background:none;border:1px solid var(--line);border-radius:5px;padding:5px 9px;cursor:pointer;font-size:0.8rem;color:var(--ink-soft);}
   .icon-btn:hover{border-color:var(--ink-soft);color:var(--ink);}
@@ -112,6 +115,7 @@
       <div class="nav-item" data-view="reservas"><span class="ic">📅</span> Reservas</div>
       <div class="nav-item" data-view="mudanzas"><span class="ic">🚚</span> Mudanzas</div>
       <div class="nav-item" data-view="tarjetas"><span class="ic">🪪</span> Tarjetas Acceso</div>
+      <div class="nav-item" data-view="mensajes"><span class="ic">💬</span> Mensajes</div>
       <div class="nav-item" data-view="config"><span class="ic">⚙</span> Configuración</div>
     </nav>
     <div class="foot">contacto@jdvm.cl</div>
@@ -622,6 +626,59 @@
       </div>
     </section>
 
+    <!-- MENSAJES -->
+    <section class="view" id="view-mensajes">
+      <div class="topline"><div><h2>Mensajes de Residentes</h2><p>Consultas recibidas por Edifito u otro canal, categorizadas con respuesta sugerida</p></div></div>
+
+      <div class="card">
+        <div class="grid-stats" id="men-stats"><p class="empty">Cargando...</p></div>
+      </div>
+
+      <div class="card">
+        <h3 id="men-form-titulo">Nuevo mensaje</h3>
+        <input type="hidden" id="men-id">
+        <div class="form-grid">
+          <div class="form-row"><label>Fecha</label><input type="text" id="men-fecha" placeholder="21-08-2026 06:50"></div>
+          <div class="form-row"><label>Canal</label><input type="text" id="men-canal" value="Edifito"></div>
+          <div class="form-row"><label>Remitente</label><input type="text" id="men-remitente"></div>
+          <div class="form-row"><label>Torre</label>
+            <select id="men-torre"><option value="">No especifica</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+          </div>
+          <div class="form-row"><label>Unidad</label><input type="text" id="men-unidad"></div>
+          <div class="form-row"><label>Asunto</label><input type="text" id="men-asunto"></div>
+        </div>
+        <div class="form-row"><label>Mensaje</label><textarea id="men-mensaje"></textarea></div>
+        <button class="btn-primary" onclick="guardarMensaje(this)">Guardar mensaje</button>
+        <button class="icon-btn" onclick="cancelarEdicionMensaje()">Cancelar</button>
+        <button class="icon-btn" onclick="document.getElementById('men-csv-input').click()">＋ Importar planilla (CSV)</button>
+        <input type="file" id="men-csv-input" accept=".csv" style="display:none;" onchange="importarMensajesCSV(event)">
+        <p class="empty" style="margin-top:8px;">El CSV debe tener columnas: <span class="mono">fecha,canal,remitente,torre,unidad,asunto,mensaje</span> (encabezados en la primera fila).</p>
+      </div>
+
+      <div class="card">
+        <div class="form-grid">
+          <div class="form-row"><label>Filtrar por categoría</label>
+            <select id="men-filtro-categoria" onchange="renderMensajes()"><option value="">Todas</option></select>
+          </div>
+          <div class="form-row"><label>Filtrar por estado</label>
+            <select id="men-filtro-estado" onchange="renderMensajes()">
+              <option value="">Todos</option><option value="nuevo">Nuevo</option><option value="en_revision">En revisión</option><option value="respondido">Respondido</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Mensajes</h3>
+        <div id="tabla-mensajes"><p class="empty">Cargando...</p></div>
+      </div>
+
+      <div class="card">
+        <h3>Respuestas tipo por categoría</h3>
+        <div id="tabla-respuestas-tipo"><p class="empty">Cargando...</p></div>
+      </div>
+    </section>
+
     <!-- CONFIGURACIÓN -->
     <section class="view" id="view-config">
       <div class="topline"><div><h2>Configuración</h2><p>Logo y firma — se aplican automáticamente a todos los correos</p></div></div>
@@ -670,7 +727,7 @@ const CONFIG = {
   API_SECRET: 'comunicacion_jdvm'
 };
 
-let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [], cacheTarjetas = [], cachePersonalEquipos = [];
+let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [], cacheTarjetas = [], cachePersonalEquipos = [], cacheMensajes = [], cacheRespuestasTipo = [];
 let campanaTipoSeleccionado = 'comunicado';
 
 if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
@@ -756,11 +813,11 @@ function toggleForm(id){
 // ========= CARGA INICIAL =========
 async function cargarTodo(){
   try{
-    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas, cacheMudanzas, cacheTarjetas, cachePersonalEquipos] = await Promise.all([
-      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas'), api('listMudanzas'), api('listTarjetas'), api('listPersonalEquipos')
+    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas, cacheMudanzas, cacheTarjetas, cachePersonalEquipos, cacheMensajes, cacheRespuestasTipo] = await Promise.all([
+      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas'), api('listMudanzas'), api('listTarjetas'), api('listPersonalEquipos'), api('listMensajes'), api('listRespuestasTipo')
     ]);
     renderPanel(); renderContactos(); renderExternos(); renderPlantillas();
-    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas(); renderMudanzas(); renderTarjetas(); renderPersonalEquipos();
+    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas(); renderMudanzas(); renderTarjetas(); renderPersonalEquipos(); renderMensajes(); renderRespuestasTipo();
   }catch(e){ /* el error ya se muestra en el banner */ }
 }
 cargarTodo();
@@ -2377,6 +2434,156 @@ function renderPersonalEquipos(){
     cachePersonalEquipos.map(p=>`<tr><td>${esc(p.nombre)||'—'}</td><td>${esc(p.cargo)}</td><td class="mono">${esc(p.numeroSerie)}</td>
     <td><button class="icon-btn" onclick="editarPersonalEquipo(${p.id})">Editar</button>
     <button class="icon-btn" onclick="eliminarPersonalEquipo(${p.id})">Eliminar</button></td></tr>`).join('') + '</table>';
+}
+
+// ========= MENSAJES DE RESIDENTES =========
+function limpiarFormularioMensaje(){
+  document.getElementById('men-id').value = '';
+  document.getElementById('men-fecha').value = '';
+  document.getElementById('men-canal').value = 'Edifito';
+  document.getElementById('men-remitente').value = '';
+  document.getElementById('men-torre').value = '';
+  document.getElementById('men-unidad').value = '';
+  document.getElementById('men-asunto').value = '';
+  document.getElementById('men-mensaje').value = '';
+  document.getElementById('men-form-titulo').textContent = 'Nuevo mensaje';
+}
+function cancelarEdicionMensaje(){ limpiarFormularioMensaje(); }
+function editarMensaje(id){
+  const m = cacheMensajes.find(x=>String(x.id)===String(id));
+  if (!m) return;
+  document.getElementById('men-id').value = m.id;
+  document.getElementById('men-fecha').value = m.fecha;
+  document.getElementById('men-canal').value = m.canal;
+  document.getElementById('men-remitente').value = m.remitente;
+  document.getElementById('men-torre').value = m.torre || '';
+  document.getElementById('men-unidad').value = m.unidad;
+  document.getElementById('men-asunto').value = m.asunto;
+  document.getElementById('men-mensaje').value = m.mensaje;
+  document.getElementById('men-form-titulo').textContent = 'Editar mensaje';
+  document.querySelector('#view-mensajes .card:nth-child(2)').scrollIntoView({behavior:'smooth'});
+}
+async function guardarMensaje(boton){
+  if (!iniciarCarga(boton)) return;
+  const id = document.getElementById('men-id').value;
+  const payload = {
+    fecha: document.getElementById('men-fecha').value,
+    canal: document.getElementById('men-canal').value,
+    remitente: document.getElementById('men-remitente').value,
+    torre: document.getElementById('men-torre').value,
+    unidad: document.getElementById('men-unidad').value,
+    asunto: document.getElementById('men-asunto').value,
+    mensaje: document.getElementById('men-mensaje').value,
+  };
+  if (!payload.mensaje){ finCarga(boton); return alert('Escribe el mensaje.'); }
+  try{
+    if (id){ payload.id = id; await api('updateMensaje', payload); }
+    else { await api('addMensaje', payload); }
+    limpiarFormularioMensaje();
+    await cargarTodo();
+  } finally { finCarga(boton, '✔ Guardado'); }
+}
+async function eliminarMensaje(id){
+  if (!confirm('¿Eliminar este mensaje?')) return;
+  await api('deleteMensaje', { id });
+  await cargarTodo();
+}
+async function cambiarEstadoMensaje(id, estado){
+  await api('updateMensaje', { id, estado });
+  await cargarTodo();
+}
+function verRespuestaSugerida(id){
+  const m = cacheMensajes.find(x=>String(x.id)===String(id));
+  if (!m) return;
+  const r = cacheRespuestasTipo.find(x=>x.categoria===m.categoria);
+  const texto = r ? r.respuesta : 'Sin respuesta tipo configurada para esta categoría.';
+  prompt('Respuesta sugerida (' + m.categoria + ') — cópiala y personalízala:', texto);
+}
+async function importarMensajesCSV(evento){
+  const file = evento.target.files[0];
+  if (!file) return;
+  const texto = await file.text();
+  const filas = parseCSV(texto);
+  const mensajes = filas.map(f => ({
+    fecha: f.fecha || '', canal: f.canal || 'Edifito', remitente: f.remitente || '',
+    torre: (f.torre||'').toUpperCase(), unidad: f.unidad || '', asunto: f.asunto || '', mensaje: f.mensaje || ''
+  })).filter(m => m.mensaje);
+  if (!mensajes.length) return alert('No se encontraron filas válidas (falta columna "mensaje").');
+  if (!confirm(`Se importarán ${mensajes.length} mensajes. ¿Continuar?`)) return;
+  try{
+    const r = await api('addMensajesBulk', { mensajes });
+    alert(`✔ Importados: ${r.agregados} de ${r.total}`);
+    await cargarTodo();
+  }catch(e){}
+  evento.target.value = '';
+}
+function renderSelectCategoriasMensajes(){
+  const categorias = [...new Set(cacheRespuestasTipo.map(r=>r.categoria))];
+  const sel = document.getElementById('men-filtro-categoria');
+  const actual = sel.value;
+  sel.innerHTML = '<option value="">Todas</option>' + categorias.map(c=>`<option>${esc(c)}</option>`).join('');
+  if (categorias.includes(actual)) sel.value = actual;
+}
+function renderStatsMensajes(){
+  const cont = document.getElementById('men-stats');
+  if (!cacheMensajes.length){ cont.innerHTML = '<p class="empty">Sin mensajes cargados aún.</p>'; return; }
+  const conteo = {};
+  cacheMensajes.forEach(m=>{ conteo[m.categoria] = (conteo[m.categoria]||0) + 1; });
+  const total = cacheMensajes.length;
+  const ordenado = Object.keys(conteo).sort((a,b)=>conteo[b]-conteo[a]);
+  cont.innerHTML = `<div class="stat-card"><div class="num">${total}</div><div class="lbl">Mensajes totales</div></div>` +
+    ordenado.slice(0,3).map(cat=>`<div class="stat-card"><div class="num">${conteo[cat]}</div><div class="lbl">${esc(cat)}</div></div>`).join('');
+}
+function renderMensajes(){
+  renderSelectCategoriasMensajes();
+  renderStatsMensajes();
+  const cont = document.getElementById('tabla-mensajes');
+  const filtroCategoria = document.getElementById('men-filtro-categoria')?.value || '';
+  const filtroEstado = document.getElementById('men-filtro-estado')?.value || '';
+  let lista = [...cacheMensajes];
+  if (filtroCategoria) lista = lista.filter(m=>m.categoria===filtroCategoria);
+  if (filtroEstado) lista = lista.filter(m=>m.estado===filtroEstado);
+  lista.sort((a,b)=> String(b.fecha).localeCompare(String(a.fecha)));
+
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin mensajes que coincidan.</p>'; return; }
+
+  cont.innerHTML = '<table><tr><th>Fecha</th><th>Remitente</th><th>Asunto/Mensaje</th><th>Categoría</th><th>Estado</th><th></th></tr>' +
+    lista.map(m=>`<tr>
+      <td class="mono">${esc(m.fecha)}</td>
+      <td>${esc(m.remitente)}${m.torre?'<br><span class="mono" style="color:var(--pending);">'+esc(m.torre)+(m.unidad?' / '+esc(m.unidad):'')+'</span>':''}</td>
+      <td><b>${esc(m.asunto)}</b><br><span style="color:var(--ink-soft);">${esc(String(m.mensaje).slice(0,120))}${String(m.mensaje).length>120?'...':''}</span></td>
+      <td><span class="badge comunicado">${esc(m.categoria)}</span></td>
+      <td>
+        <select onchange="cambiarEstadoMensaje(${m.id}, this.value)" style="font-size:0.78rem;padding:3px 6px;">
+          <option value="nuevo" ${m.estado==='nuevo'?'selected':''}>Nuevo</option>
+          <option value="en_revision" ${m.estado==='en_revision'?'selected':''}>En revisión</option>
+          <option value="respondido" ${m.estado==='respondido'?'selected':''}>Respondido</option>
+        </select>
+      </td>
+      <td>
+        <button class="icon-btn" onclick="verRespuestaSugerida(${m.id})">💡 Sugerencia</button>
+        <button class="icon-btn" onclick="editarMensaje(${m.id})">Editar</button>
+        <button class="icon-btn" onclick="eliminarMensaje(${m.id})">Eliminar</button>
+      </td>
+    </tr>`).join('') + '</table>';
+}
+
+// ========= RESPUESTAS TIPO =========
+async function guardarRespuestaTipoInline(id, textarea){
+  const respuesta = textarea.value;
+  await api('updateRespuestaTipo', { id, respuesta });
+  const tag = textarea.nextElementSibling;
+  if (tag){ tag.style.display='inline-block'; setTimeout(()=>tag.style.display='none', 1500); }
+}
+function renderRespuestasTipo(){
+  const cont = document.getElementById('tabla-respuestas-tipo');
+  if (!cacheRespuestasTipo.length){ cont.innerHTML = '<p class="empty">Sin respuestas tipo aún.</p>'; return; }
+  cont.innerHTML = cacheRespuestasTipo.map(r=>`
+    <div class="form-row">
+      <label>${esc(r.categoria)}</label>
+      <textarea onchange="guardarRespuestaTipoInline(${r.id}, this)" style="min-height:70px;">${esc(r.respuesta)}</textarea>
+      <span class="tag" style="display:none;margin-top:4px;">✔ Guardado</span>
+    </div>`).join('');
 }
 
 // ========= UTIL =========
