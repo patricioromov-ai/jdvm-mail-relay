@@ -1836,7 +1836,8 @@ async function guardarReserva(boton){
   const notas = document.getElementById('res-notas').value;
 
   if (!espacio || !fecha || !horaInicio || !horaTermino || !nombreSolicitante){ finCarga(boton); return alert('Completa espacio, fecha, horario y nombre del solicitante.'); }
-  if (horaTermino <= horaInicio){ finCarga(boton); return alert('La hora de término debe ser posterior a la de inicio.'); }
+  if (horaTermino === horaInicio){ finCarga(boton); return alert('La hora de término no puede ser igual a la de inicio.'); }
+  if (horaTermino < horaInicio && !confirm('La hora de término es antes que la de inicio — se entiende que la reserva termina pasada la medianoche (ej. 17:00 a 01:00 del día siguiente). ¿Es correcto?')){ finCarga(boton); return; }
 
   const payload = { espacio, fecha, horaInicio, horaTermino, nombreSolicitante, unidad, torre, notas };
   try{
