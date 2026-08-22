@@ -48,6 +48,7 @@
   .badge{display:inline-block;font-size:0.72rem;padding:2px 9px;border-radius:20px;font-weight:500;}
   .badge.propietario{background:#E4EEE9;color:var(--torre-b);}
   .badge.arrendatario{background:#F2E8DA;color:var(--torre-c);}
+  .badge.corredor{background:#EDE3F5;color:var(--torre-d);}
   .badge.comunicado{background:#E7E9F0;color:var(--ink-soft);}
   .badge.encuesta{background:#EDE3F5;color:var(--torre-d);}
   .badge.enviada{background:#E4EEE9;color:var(--torre-b);}
@@ -182,7 +183,7 @@
             <select id="c-torre"><option>A</option><option>B</option><option>C</option><option>D</option></select>
           </div>
           <div class="form-row"><label>Tipo</label>
-            <select id="c-tipo"><option value="propietario">Propietario</option><option value="arrendatario">Arrendatario</option></select>
+            <select id="c-tipo"><option value="propietario">Propietario</option><option value="arrendatario">Arrendatario</option><option value="corredor">Corredor de propiedades</option></select>
           </div>
           <div class="form-row"><label>Teléfono</label><input type="text" id="c-telefono" placeholder="+56 9 ..."></div>
           <div class="form-row"><label>N° depto/unidad</label><input type="text" id="c-unidad"></div>
@@ -209,6 +210,7 @@
           <div class="filtro-tab active" data-filtro-tipo="" onclick="filtrarPorTipo('', this)">Todos</div>
           <div class="filtro-tab" data-filtro-tipo="propietario" onclick="filtrarPorTipo('propietario', this)">Propietarios</div>
           <div class="filtro-tab" data-filtro-tipo="arrendatario" onclick="filtrarPorTipo('arrendatario', this)">Arrendatarios</div>
+          <div class="filtro-tab" data-filtro-tipo="corredor" onclick="filtrarPorTipo('corredor', this)">Corredores</div>
         </div>
         <div class="subtabs" style="margin-bottom:14px;align-items:center;">
           <div class="filtro-tab active" data-filtro-torre="" onclick="filtrarPorTorre('', this)">Todas las torres</div>
@@ -761,7 +763,7 @@ const CONFIG = {
   API_SECRET: 'comunicacion_jdvm'
 };
 
-let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [], cacheTarjetas = [], cachePersonalEquipos = [], cacheMensajes = [], cacheRespuestasTipo = [], cacheHistorialCambios = [];
+let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [], cacheTarjetas = [], cachePersonalEquipos = [], cacheMensajes = [], cacheRespuestasTipo = [], cacheHistorialCambios = [], cacheAnomaliasAceptadas = [];
 let campanaTipoSeleccionado = 'comunicado';
 
 if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
@@ -847,8 +849,8 @@ function toggleForm(id){
 // ========= CARGA INICIAL =========
 async function cargarTodo(){
   try{
-    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas, cacheMudanzas, cacheTarjetas, cachePersonalEquipos, cacheMensajes, cacheRespuestasTipo, cacheHistorialCambios] = await Promise.all([
-      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas'), api('listMudanzas'), api('listTarjetas'), api('listPersonalEquipos'), api('listMensajes'), api('listRespuestasTipo'), api('listHistorialCambiosContactos')
+    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas, cacheMudanzas, cacheTarjetas, cachePersonalEquipos, cacheMensajes, cacheRespuestasTipo, cacheHistorialCambios, cacheAnomaliasAceptadas] = await Promise.all([
+      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas'), api('listMudanzas'), api('listTarjetas'), api('listPersonalEquipos'), api('listMensajes'), api('listRespuestasTipo'), api('listHistorialCambiosContactos'), api('listAnomaliasAceptadas')
     ]);
     renderPanel(); renderContactos(); renderExternos(); renderPlantillas();
     renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas(); renderMudanzas(); renderTarjetas(); renderPersonalEquipos(); renderMensajes(); renderRespuestasTipo(); renderAnomalias();
@@ -1034,7 +1036,7 @@ function renderContactos(){
     <td class="mono">${esc(c.unidad)||'—'}</td>
     <td class="mono">${esc(c.estacionamiento)||'—'}</td>
     <td class="mono">${esc(c.bodega)||'—'}</td>
-    <td><span class="badge ${c.tipo}">${c.tipo==='propietario'?'Propietario':'Arrendatario'}</span></td>
+    <td><span class="badge ${c.tipo}">${c.tipo==='propietario'?'Propietario':c.tipo==='corredor'?'Corredor':'Arrendatario'}</span></td>
     <td class="mono">${esc(c.email)}</td>
     <td>
       <button class="icon-btn" onclick="abrirEnvioIndividual(${c.id}, false)">Enviar ✉</button>
@@ -2683,6 +2685,13 @@ function renderRespuestasTipo(){
 }
 
 // ========= ANOMALÍAS =========
+function estaAceptada(firma){
+  return cacheAnomaliasAceptadas.some(a=>a.firma===firma);
+}
+async function aceptarAnomalia(firma, detalle){
+  await api('aceptarAnomalia', { firma, detalle: detalle||'' });
+  await cargarTodo();
+}
 function renderAnomalias(){
   renderAnomDuplicados();
   renderAnomInconsistentes();
@@ -2693,16 +2702,18 @@ function renderAnomDuplicados(){
   const cont = document.getElementById('anom-duplicados');
   if (!cont) return;
   const grupos = {};
-  cacheContactos.forEach(c=>{
+  cacheContactos.filter(c=>c.tipo!=='corredor').forEach(c=>{
     const email = String(c.email||'').toLowerCase().trim();
     if (!email) return;
     (grupos[email] = grupos[email] || []).push(c);
   });
-  const duplicados = Object.entries(grupos).filter(([,lista])=>lista.length>1);
+  const duplicados = Object.entries(grupos).filter(([email,lista])=>lista.length>1 && !estaAceptada('dup:'+email));
   if (!duplicados.length){ cont.innerHTML = '<p class="empty">Sin duplicados detectados.</p>'; return; }
   cont.innerHTML = `<p class="empty" style="margin-bottom:8px;">${duplicados.length} email(s) repetidos</p>` +
-    '<table><tr><th>Email</th><th>Contactos</th></tr>' +
-    duplicados.map(([email,lista])=>`<tr><td class="mono">${esc(email)}</td><td>${lista.map(c=>esc(c.nombre)+' ('+esc(c.torre)+'/'+esc(c.unidad)+', '+esc(c.tipo)+')').join('<br>')}</td></tr>`).join('') +
+    '<table><tr><th></th><th>Email</th><th>Contactos</th></tr>' +
+    duplicados.map(([email,lista])=>`<tr>
+      <td><button class="icon-btn" onclick="aceptarAnomalia('dup:${email}','${esc(email)}')">✔ Aceptar</button></td>
+      <td class="mono">${esc(email)}</td><td>${lista.map(c=>esc(c.nombre)+' ('+esc(c.torre)+'/'+esc(c.unidad)+', '+esc(c.tipo)+')').join('<br>')}</td></tr>`).join('') +
     '</table>';
 }
 function renderAnomInconsistentes(){
@@ -2712,24 +2723,24 @@ function renderAnomInconsistentes(){
     if (!c.unidad || !c.torre) return false;
     const prefijo = String(c.unidad).split('-')[0].toUpperCase();
     return prefijo && prefijo !== c.torre;
-  });
+  }).filter(c=>!estaAceptada('torreunidad:'+c.id));
   const telefonoMal = cacheContactos.filter(c=>{
     if (!c.telefono) return false;
     const soloDigitos = String(c.telefono).replace(/\D/g,'');
     return soloDigitos.length < 8 || soloDigitos.length > 12;
-  });
+  }).filter(c=>!estaAceptada('telefono:'+c.id));
 
   let html = '';
   html += `<p style="font-weight:600;font-size:0.85rem;margin-bottom:6px;">Torre no coincide con la unidad (${torreUnidadMal.length})</p>`;
   html += torreUnidadMal.length
-    ? '<table><tr><th>Nombre</th><th>Torre asignada</th><th>Unidad</th></tr>' +
-      torreUnidadMal.map(c=>`<tr><td>${esc(c.nombre)}</td><td>${esc(c.torre)}</td><td class="mono">${esc(c.unidad)}</td></tr>`).join('') + '</table>'
+    ? '<table><tr><th></th><th>Nombre</th><th>Torre asignada</th><th>Unidad</th></tr>' +
+      torreUnidadMal.map(c=>`<tr><td><button class="icon-btn" onclick="aceptarAnomalia('torreunidad:${c.id}','${esc(c.nombre)}')">✔ Aceptar</button></td><td>${esc(c.nombre)}</td><td>${esc(c.torre)}</td><td class="mono">${esc(c.unidad)}</td></tr>`).join('') + '</table>'
     : '<p class="empty">Sin casos.</p>';
 
   html += `<p style="font-weight:600;font-size:0.85rem;margin:16px 0 6px;">Teléfonos con formato dudoso (${telefonoMal.length})</p>`;
   html += telefonoMal.length
-    ? '<table><tr><th>Nombre</th><th>Teléfono registrado</th></tr>' +
-      telefonoMal.map(c=>`<tr><td>${esc(c.nombre)}</td><td class="mono">${esc(c.telefono)}</td></tr>`).join('') + '</table>'
+    ? '<table><tr><th></th><th>Nombre</th><th>Teléfono registrado</th></tr>' +
+      telefonoMal.map(c=>`<tr><td><button class="icon-btn" onclick="aceptarAnomalia('telefono:${c.id}','${esc(c.nombre)}')">✔ Aceptar</button></td><td>${esc(c.nombre)}</td><td class="mono">${esc(c.telefono)}</td></tr>`).join('') + '</table>'
     : '<p class="empty">Sin casos.</p>';
 
   cont.innerHTML = html;
@@ -2743,12 +2754,12 @@ function renderAnomUnidades(){
     (grupos[u] = grupos[u] || []).push(c);
   });
   const UMBRAL = 4;
-  const sobrecargadas = Object.entries(grupos).filter(([,lista])=>lista.length > UMBRAL);
+  const sobrecargadas = Object.entries(grupos).filter(([u,lista])=>lista.length > UMBRAL && !estaAceptada('unidad:'+u));
 
   let html = `<p style="font-weight:600;font-size:0.85rem;margin-bottom:6px;">Unidades con más de ${UMBRAL} contactos (${sobrecargadas.length})</p>`;
   html += sobrecargadas.length
-    ? '<table><tr><th>Unidad</th><th>Cantidad</th><th>Contactos</th></tr>' +
-      sobrecargadas.map(([u,lista])=>`<tr><td class="mono">${esc(u)}</td><td class="mono">${lista.length}</td><td>${lista.map(c=>esc(c.nombre)).join(', ')}</td></tr>`).join('') + '</table>'
+    ? '<table><tr><th></th><th>Unidad</th><th>Cantidad</th><th>Contactos</th></tr>' +
+      sobrecargadas.map(([u,lista])=>`<tr><td><button class="icon-btn" onclick="aceptarAnomalia('unidad:${u}','${esc(u)}')">✔ Aceptar</button></td><td class="mono">${esc(u)}</td><td class="mono">${lista.length}</td><td>${lista.map(c=>esc(c.nombre)).join(', ')}</td></tr>`).join('') + '</table>'
     : '<p class="empty">Sin casos.</p>';
   html += '<p class="empty" style="margin-top:10px;">Unidades sin ningún contacto: revisa el indicador en <b>Panel → Calidad de datos</b>.</p>';
 
@@ -2757,10 +2768,10 @@ function renderAnomUnidades(){
 function renderAnomCambios(){
   const cont = document.getElementById('anom-cambios');
   if (!cont) return;
-  if (!cacheHistorialCambios.length){ cont.innerHTML = '<p class="empty">Sin cambios registrados todavía.</p>'; return; }
-  const lista = [...cacheHistorialCambios].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
-  cont.innerHTML = '<table><tr><th>Fecha</th><th>Contacto</th><th>Campo</th><th>Antes</th><th>Después</th></tr>' +
-    lista.map(h=>`<tr><td class="mono">${esc(h.fecha)}</td><td>${esc(h.nombreContacto)}</td><td>${esc(h.campo)}</td>
+  const lista = cacheHistorialCambios.filter(h=>!estaAceptada('cambio:'+h.id)).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin cambios pendientes de revisar.</p>'; return; }
+  cont.innerHTML = '<table><tr><th></th><th>Fecha</th><th>Contacto</th><th>Campo</th><th>Antes</th><th>Después</th></tr>' +
+    lista.map(h=>`<tr><td><button class="icon-btn" onclick="aceptarAnomalia('cambio:${h.id}')">✔ Aceptar</button></td><td class="mono">${formatearFechaLocal(h.fecha)}</td><td>${esc(h.nombreContacto)}</td><td>${esc(h.campo)}</td>
     <td>${esc(h.valorAnterior)}</td><td>${esc(h.valorNuevo)}</td></tr>`).join('') + '</table>';
 }
 
