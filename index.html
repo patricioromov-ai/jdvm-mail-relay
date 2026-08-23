@@ -2816,8 +2816,19 @@ function renderAnomCambios(){
   const lista = cacheHistorialCambios.filter(h=>!estaAceptada('cambio:'+h.id)).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
   if (!lista.length){ cont.innerHTML = '<p class="empty">Sin cambios pendientes de revisar.</p>'; return; }
   cont.innerHTML = '<table><tr><th></th><th>Fecha</th><th>Contacto</th><th>Campo</th><th>Antes</th><th>Después</th></tr>' +
-    lista.map(h=>`<tr><td><button class="icon-btn" onclick="aceptarAnomalia('cambio:${h.id}')">✔ Aceptar</button></td><td class="mono">${formatearFechaLocal(h.fecha)}</td><td>${esc(h.nombreContacto)}</td><td>${esc(h.campo)}</td>
+    lista.map(h=>`<tr><td>
+      <button class="icon-btn" onclick="aceptarAnomalia('cambio:${h.id}')">✔ Aceptar</button>
+      <button class="icon-btn" onclick="rechazarCambio(${h.id})">✘ Rechazar</button>
+    </td><td class="mono">${formatearFechaLocal(h.fecha)}</td><td>${esc(h.nombreContacto)}</td><td>${esc(h.campo)}</td>
     <td>${esc(h.valorAnterior)}</td><td>${esc(h.valorNuevo)}</td></tr>`).join('') + '</table>';
+}
+async function rechazarCambio(historialId){
+  if (!confirm('¿Rechazar este cambio? El campo vuelve a su valor anterior.')) return;
+  try{
+    const r = await api('rechazarCambioContacto', { historialId });
+    alert('✔ Revertido a: ' + r.valorRestaurado);
+    await cargarTodo();
+  }catch(e){}
 }
 
 // ========= UTIL =========
