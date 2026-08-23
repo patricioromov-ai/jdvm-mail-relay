@@ -686,7 +686,11 @@
           <div class="form-row"><label>Tope de inscritos (0 = sin límite)</label><input type="number" id="fi-tope" value="0" min="0"></div>
           <div class="form-row"><label>Fecha de cierre (opcional)</label><input type="datetime-local" id="fi-fecha-cierre"></div>
         </div>
-        <div class="form-row"><label>Descripción</label><input type="text" id="fi-descripcion"></div>
+        <div class="form-row"><label>Descripción (breve, se muestra debajo del título)</label><input type="text" id="fi-descripcion"></div>
+        <div class="form-row">
+          <label>Información adicional (requisitos, recomendaciones, etc. — se muestra en un recuadro destacado)</label>
+          <textarea id="fi-info-extra" placeholder="Ej: Traer utensilios propios. Cupo por familia. Evento apto para todas las edades."></textarea>
+        </div>
         <div class="form-row">
           <label>Campos extra (además de depto, nombre, apellido, teléfono, correo)</label>
           <div id="fi-campos-extra-lista"></div>
@@ -2959,6 +2963,7 @@ function limpiarFormularioInscripcion(){
   document.getElementById('fi-tope').value = '0';
   document.getElementById('fi-fecha-cierre').value = '';
   document.getElementById('fi-descripcion').value = '';
+  document.getElementById('fi-info-extra').value = '';
   camposExtraTemp = [];
   renderCamposExtraLista();
   document.getElementById('form-inscr-titulo').textContent = 'Nuevo formulario';
@@ -2972,6 +2977,7 @@ function editarFormulario(id){
   document.getElementById('fi-tope').value = f.topeInscritos || 0;
   document.getElementById('fi-fecha-cierre').value = f.fechaCierre ? isoAFechaLocal(f.fechaCierre) : '';
   document.getElementById('fi-descripcion').value = f.descripcion || '';
+  document.getElementById('fi-info-extra').value = f.informacionAdicional || '';
   try{ camposExtraTemp = JSON.parse(f.camposExtra || '[]'); }catch(e){ camposExtraTemp = []; }
   renderCamposExtraLista();
   document.getElementById('form-inscr-titulo').textContent = 'Editar formulario';
@@ -2987,6 +2993,7 @@ async function guardarFormulario(boton){
     nombre,
     topeInscritos: document.getElementById('fi-tope').value,
     descripcion: document.getElementById('fi-descripcion').value,
+    informacionAdicional: document.getElementById('fi-info-extra').value,
     camposExtra: JSON.stringify(camposExtraTemp),
     fechaCierre: fechaCierreInput ? fechaCierreInput.replace('T',' ') : ''
   };
@@ -3017,16 +3024,19 @@ function copiarLinkFormulario(id){
 function renderFormularios(){
   const cont = document.getElementById('tabla-formularios');
   if (!cacheFormularios.length){ cont.innerHTML = '<p class="empty">Sin formularios creados aún.</p>'; return; }
-  cont.innerHTML = '<table><tr><th>Nombre</th><th>Cupos</th><th>Estado</th><th>Cierre</th><th>Link</th><th></th></tr>' +
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Cupos</th><th>Estado</th><th>Cierre</th><th>Link</th><th>QR</th><th></th></tr>' +
     cacheFormularios.map(f=>{
       const inscritosCount = cacheInscripcionesPorFormulario(f.id).length;
       const cuposTxt = Number(f.topeInscritos) > 0 ? `${inscritosCount} / ${f.topeInscritos}` : `${inscritosCount} (sin límite)`;
+      const urlQrChica = 'https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=' + encodeURIComponent(linkInscripcion(f));
+      const urlQrGrande = 'https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=' + encodeURIComponent(linkInscripcion(f));
       return `<tr>
         <td>${esc(f.nombre)}</td>
         <td class="mono">${cuposTxt}</td>
         <td><span class="badge ${f.estado==='activo'?'enviada':'borrador'}">${esc(f.estado)}</span></td>
         <td class="mono">${f.fechaCierre ? formatearFechaLocal(f.fechaCierre.replace(' ','T')) : '—'}</td>
         <td class="mono"><a href="${esc(linkInscripcion(f))}" target="_blank">${esc(linkInscripcion(f))}</a></td>
+        <td><a href="${urlQrGrande}" target="_blank" title="Ver/descargar QR en grande"><img src="${urlQrChica}" alt="QR" style="display:block;border-radius:4px;"></a></td>
         <td>
           <button class="icon-btn" onclick="verInscritos(${f.id})">Ver inscritos</button>
           <button class="icon-btn" onclick="copiarLinkFormulario(${f.id})">🔗 Copiar link</button>
