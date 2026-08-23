@@ -505,14 +505,33 @@
       <div class="card">
         <h3 id="mud-form-titulo">Nueva mudanza</h3>
         <input type="hidden" id="mud-id">
+        <input type="hidden" id="mud-contacto-id">
         <div class="form-grid">
           <div class="form-row"><label>Tipo</label>
-            <select id="mud-tipo"><option value="ingreso">Ingreso</option><option value="salida">Salida</option></select>
+            <select id="mud-tipo" onchange="cambiarTipoMudanza()">
+              <option value="ingreso">Ingreso</option>
+              <option value="salida">Salida</option>
+              <option value="traslado_interno">Traslado interno (cambio de depto)</option>
+              <option value="muebles">Muebles (retiro/ingreso)</option>
+            </select>
           </div>
-          <div class="form-row"><label>Torre</label>
+        </div>
+
+        <div id="mud-origen-row" class="form-grid" style="display:none;">
+          <div class="form-row"><label>Torre origen</label>
+            <select id="mud-torre-origen" onchange="buscarContactosOrigen()"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+          </div>
+          <div class="form-row"><label>Depto origen</label><input type="text" id="mud-unidad-origen" placeholder="Ej. A-0501" onchange="buscarContactosOrigen()"></div>
+          <div class="form-row"><label>Contacto que se traslada</label>
+            <select id="mud-contacto-select" onchange="document.getElementById('mud-contacto-id').value=this.value;"><option value="">Escribe torre/depto origen primero</option></select>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-row"><label id="mud-torre-label">Torre</label>
             <select id="mud-torre"><option>A</option><option>B</option><option>C</option><option>D</option></select>
           </div>
-          <div class="form-row"><label>Unidad</label><input type="text" id="mud-unidad" placeholder="Ej. A-0501"></div>
+          <div class="form-row"><label id="mud-unidad-label">Unidad</label><input type="text" id="mud-unidad" placeholder="Ej. A-0501"></div>
           <div class="form-row"><label>Fecha</label><input type="date" id="mud-fecha"></div>
           <div class="form-row"><label>Hora inicio</label><input type="time" id="mud-hora-inicio" onchange="calcularHoraTermino()"></div>
           <div class="form-row"><label>Hora término</label><input type="time" id="mud-hora-termino"></div>
@@ -2182,6 +2201,29 @@ function imprimirReservas(){
 }
 
 // ========= MUDANZAS =========
+function labelTipoMudanza(t){ return t==='ingreso'?'Ingreso':t==='salida'?'Salida':t==='traslado_interno'?'Traslado interno':t==='muebles'?'Muebles':t; }
+
+function cambiarTipoMudanza(){
+  const tipo = document.getElementById('mud-tipo').value;
+  const esTraslado = tipo === 'traslado_interno';
+  document.getElementById('mud-origen-row').style.display = esTraslado ? 'grid' : 'none';
+  document.getElementById('mud-torre-label').textContent = esTraslado ? 'Torre destino' : 'Torre';
+  document.getElementById('mud-unidad-label').textContent = esTraslado ? 'Depto destino' : 'Unidad';
+  if (!esTraslado){
+    document.getElementById('mud-contacto-id').value = '';
+    document.getElementById('mud-contacto-select').innerHTML = '<option value="">Escribe torre/depto origen primero</option>';
+  }
+}
+function buscarContactosOrigen(){
+  const torre = document.getElementById('mud-torre-origen').value;
+  const unidad = document.getElementById('mud-unidad-origen').value.trim();
+  const sel = document.getElementById('mud-contacto-select');
+  if (!unidad){ sel.innerHTML = '<option value="">Escribe el depto origen</option>'; return; }
+  const candidatos = cacheContactos.filter(c => c.torre===torre && String(c.unidad).toUpperCase()===unidad.toUpperCase());
+  if (!candidatos.length){ sel.innerHTML = '<option value="">Sin contactos encontrados en esa unidad</option>'; document.getElementById('mud-contacto-id').value=''; return; }
+  sel.innerHTML = '<option value="">Selecciona quién se traslada</option>' +
+    candidatos.map(c=>`<option value="${c.id}">${esc(c.nombre)} (${esc(c.tipo)})</option>`).join('');
+}
 function calcularHoraTermino(){
   const inicio = document.getElementById('mud-hora-inicio').value;
   if (!inicio) return;
@@ -2196,6 +2238,10 @@ function limpiarFormularioMudanza(){
   document.getElementById('mud-tipo').value = 'ingreso';
   document.getElementById('mud-torre').value = 'A';
   document.getElementById('mud-unidad').value = '';
+  document.getElementById('mud-torre-origen').value = 'A';
+  document.getElementById('mud-unidad-origen').value = '';
+  document.getElementById('mud-contacto-id').value = '';
+  document.getElementById('mud-contacto-select').innerHTML = '<option value="">Escribe torre/depto origen primero</option>';
   document.getElementById('mud-fecha').value = '';
   document.getElementById('mud-hora-inicio').value = '';
   document.getElementById('mud-hora-termino').value = '';
@@ -2207,6 +2253,7 @@ function limpiarFormularioMudanza(){
   document.getElementById('mud-excepcion').checked = false;
   document.getElementById('mud-notas').value = '';
   document.getElementById('mud-form-titulo').textContent = 'Nueva mudanza';
+  cambiarTipoMudanza();
 }
 function cancelarEdicionMudanza(){ limpiarFormularioMudanza(); }
 function editarMudanza(id){
@@ -2216,6 +2263,9 @@ function editarMudanza(id){
   document.getElementById('mud-tipo').value = m.tipo;
   document.getElementById('mud-torre').value = m.torre;
   document.getElementById('mud-unidad').value = m.unidad;
+  document.getElementById('mud-torre-origen').value = m.torreOrigen || 'A';
+  document.getElementById('mud-unidad-origen').value = m.unidadOrigen || '';
+  document.getElementById('mud-contacto-id').value = m.contactoId || '';
   document.getElementById('mud-fecha').value = m.fecha;
   document.getElementById('mud-hora-inicio').value = m.horaInicio;
   document.getElementById('mud-hora-termino').value = m.horaTermino;
@@ -2227,6 +2277,11 @@ function editarMudanza(id){
   document.getElementById('mud-excepcion').checked = m.excepcionHorario === 'si';
   document.getElementById('mud-notas').value = m.notas;
   document.getElementById('mud-form-titulo').textContent = 'Editar mudanza';
+  cambiarTipoMudanza();
+  if (m.tipo === 'traslado_interno'){
+    buscarContactosOrigen();
+    setTimeout(()=>{ document.getElementById('mud-contacto-select').value = m.contactoId || ''; }, 50);
+  }
   document.querySelector('#view-mudanzas .card:nth-child(2)').scrollIntoView({behavior:'smooth'});
 }
 async function guardarMudanza(boton){
@@ -2245,10 +2300,16 @@ async function guardarMudanza(boton){
     vehiculoPatente: document.getElementById('mud-vehiculo-patente').value,
     esArrendatario: document.getElementById('mud-arrendatario').checked ? 'si' : 'no',
     excepcionHorario: document.getElementById('mud-excepcion').checked ? 'si' : 'no',
+    torreOrigen: document.getElementById('mud-torre-origen').value,
+    unidadOrigen: document.getElementById('mud-unidad-origen').value,
+    contactoId: document.getElementById('mud-contacto-id').value,
     notas: document.getElementById('mud-notas').value
   };
   if (!payload.unidad || !payload.fecha || !payload.horaInicio || !payload.horaTermino || !payload.nombreResponsable){
     finCarga(boton); return alert('Completa unidad, fecha, horario y nombre del responsable.');
+  }
+  if (payload.tipo === 'traslado_interno' && !payload.contactoId){
+    finCarga(boton); return alert('Selecciona qué contacto se traslada (busca por torre/depto origen).');
   }
   if (payload.excepcionHorario === 'si' && !payload.notas.trim()){
     finCarga(boton); return alert('Si autorizas una excepción de horario, debes justificarla en el campo Notas.');
@@ -2278,12 +2339,16 @@ function renderHistorialMudanzas(){
   cont.innerHTML = '<table><tr><th>Fecha</th><th>Horario</th><th>Torre/Unidad</th><th>Tipo</th><th>Responsable</th><th>Estado</th></tr>' +
     lista.map(m=>`<tr><td class="mono">${esc(m.fecha)}</td><td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}</td>
     <td><span class="torre-tab ${String(m.torre).toLowerCase()}"></span>${esc(m.torre)} / ${esc(m.unidad)}</td>
-    <td>${m.tipo==='ingreso'?'Ingreso':'Salida'}</td><td>${esc(m.nombreResponsable)}</td>
+    <td>${labelTipoMudanza(m.tipo)}</td><td>${esc(m.nombreResponsable)}</td>
     <td><span class="badge ${m.estado==='realizada'?'enviada':'borrador'}">${esc(m.estado)}</span></td></tr>`).join('') + '</table>';
 }
 async function marcarMudanzaRealizada(id){
-  if (!confirm('¿Marcar esta mudanza como realizada? Se saca de la lista activa y queda en el historial.')) return;
-  await api('updateMudanza', { id, estado: 'realizada' });
+  const m = cacheMudanzas.find(x=>String(x.id)===String(id));
+  const msg = (m && m.tipo==='traslado_interno')
+    ? '¿Marcar como realizada? Esto actualizará automáticamente la torre/unidad del contacto asociado en Contactos.'
+    : '¿Marcar esta mudanza como realizada? Se saca de la lista activa y queda en el historial.';
+  if (!confirm(msg)) return;
+  await api('marcarMudanzaRealizada', { id });
   await cargarTodo();
 }
 async function eliminarMudanza(id){
@@ -2328,7 +2393,7 @@ function renderMudanzas(){
     const filas = grupos[fecha].map(m=>`<tr>
       <td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}${m.excepcionHorario==='si' ? '<br><span class="badge borrador" title="Fuera del horario habitual">⚠ Excepción</span>' : ''}</td>
       <td><span class="torre-tab ${String(m.torre).toLowerCase()}"></span>${esc(m.torre)} / ${esc(m.unidad)}</td>
-      <td>${m.tipo==='ingreso'?'Ingreso':'Salida'}</td>
+      <td>${labelTipoMudanza(m.tipo)}</td>
       <td>${esc(m.nombreResponsable)}${m.vehiculoPatente ? '<br><span class="mono" style="color:var(--pending);">'+esc(m.vehiculoPatente)+'</span>' : ''}</td>
       <td>Admin: ${chip(m.aprobacionAdmin)}<br>Dueño: ${chip(m.aprobacionDueno)}</td>
       <td>
@@ -2369,7 +2434,7 @@ function imprimirMudanzas(){
       const filas = grupos[fecha].map(m=>`<tr>
         <td>${esc(m.horaInicio)}–${esc(m.horaTermino)}</td>
         <td>Torre ${esc(m.torre)} / ${esc(m.unidad)}</td>
-        <td>${m.tipo==='ingreso'?'Ingreso':'Salida'}</td>
+        <td>${labelTipoMudanza(m.tipo)}</td>
         <td>${esc(m.nombreResponsable)}${m.telefonoResponsable ? '<br>'+esc(m.telefonoResponsable) : ''}</td>
         <td>${esc(m.vehiculoTipo)||'-'}${m.vehiculoPatente ? ' / '+esc(m.vehiculoPatente) : ''}</td>
         <td>Admin: ${esc(m.aprobacionAdmin)}<br>Dueño: ${esc(m.aprobacionDueno)}</td>
