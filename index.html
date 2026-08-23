@@ -116,6 +116,7 @@
       <div class="nav-item" data-view="reservas"><span class="ic">📅</span> Reservas</div>
       <div class="nav-item" data-view="mudanzas"><span class="ic">🚚</span> Mudanzas</div>
       <div class="nav-item" data-view="tarjetas"><span class="ic">🪪</span> Tarjetas Acceso</div>
+      <div class="nav-item" data-view="formularios"><span class="ic">📝</span> Formularios</div>
       <div class="nav-item" data-view="mensajes"><span class="ic">💬</span> Mensajes</div>
       <div class="nav-item" data-view="anomalias"><span class="ic">⚠</span> Anomalías</div>
       <div class="nav-item" data-view="config"><span class="ic">⚙</span> Configuración</div>
@@ -673,6 +674,42 @@
       </div>
     </section>
 
+    <!-- FORMULARIOS -->
+    <section class="view" id="view-formularios">
+      <div class="topline"><div><h2>Formularios de Inscripción</h2><p>Actividades y eventos con tope de cupos, link público, PDF/Excel y envío por correo</p></div></div>
+
+      <div class="card">
+        <h3 id="form-inscr-titulo">Nuevo formulario</h3>
+        <input type="hidden" id="fi-id">
+        <div class="form-grid">
+          <div class="form-row"><label>Nombre de la actividad</label><input type="text" id="fi-nombre" placeholder="Ej. Fiesta de Navidad"></div>
+          <div class="form-row"><label>Tope de inscritos (0 = sin límite)</label><input type="number" id="fi-tope" value="0" min="0"></div>
+          <div class="form-row"><label>Fecha de cierre (opcional)</label><input type="datetime-local" id="fi-fecha-cierre"></div>
+        </div>
+        <div class="form-row"><label>Descripción</label><input type="text" id="fi-descripcion"></div>
+        <div class="form-row">
+          <label>Campos extra (además de depto, nombre, apellido, teléfono, correo)</label>
+          <div id="fi-campos-extra-lista"></div>
+          <div style="margin-top:8px;">
+            <input type="text" id="fi-campo-extra-nuevo" placeholder="Ej. N° de acompañantes" style="max-width:260px;display:inline-block;">
+            <button class="icon-btn" onclick="agregarCampoExtra()">＋ Agregar campo</button>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="guardarFormulario(this)">Guardar formulario</button>
+        <button class="icon-btn" onclick="cancelarEdicionFormulario()">Cancelar</button>
+      </div>
+
+      <div class="card">
+        <h3>Formularios creados</h3>
+        <div id="tabla-formularios"><p class="empty">Cargando...</p></div>
+      </div>
+
+      <div class="card" id="card-inscritos" style="display:none;">
+        <h3 id="inscritos-titulo">Inscritos</h3>
+        <div id="tabla-inscritos"></div>
+      </div>
+    </section>
+
     <!-- MENSAJES -->
     <section class="view" id="view-mensajes">
       <div class="topline"><div><h2>Mensajes de Residentes</h2><p>Consultas recibidas por Edifito u otro canal, categorizadas con respuesta sugerida</p></div></div>
@@ -774,7 +811,7 @@ const CONFIG = {
   API_SECRET: 'comunicacion_jdvm'
 };
 
-let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [], cacheTarjetas = [], cachePersonalEquipos = [], cacheMensajes = [], cacheRespuestasTipo = [], cacheHistorialCambios = [], cacheAnomaliasAceptadas = [];
+let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [], cacheTarjetas = [], cachePersonalEquipos = [], cacheMensajes = [], cacheRespuestasTipo = [], cacheHistorialCambios = [], cacheAnomaliasAceptadas = [], cacheFormularios = [], camposExtraTemp = [];
 let campanaTipoSeleccionado = 'comunicado';
 
 if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
@@ -860,11 +897,11 @@ function toggleForm(id){
 // ========= CARGA INICIAL =========
 async function cargarTodo(){
   try{
-    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas, cacheMudanzas, cacheTarjetas, cachePersonalEquipos, cacheMensajes, cacheRespuestasTipo, cacheHistorialCambios, cacheAnomaliasAceptadas] = await Promise.all([
-      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas'), api('listMudanzas'), api('listTarjetas'), api('listPersonalEquipos'), api('listMensajes'), api('listRespuestasTipo'), api('listHistorialCambiosContactos'), api('listAnomaliasAceptadas')
+    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas, cacheMudanzas, cacheTarjetas, cachePersonalEquipos, cacheMensajes, cacheRespuestasTipo, cacheHistorialCambios, cacheAnomaliasAceptadas, cacheFormularios] = await Promise.all([
+      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas'), api('listMudanzas'), api('listTarjetas'), api('listPersonalEquipos'), api('listMensajes'), api('listRespuestasTipo'), api('listHistorialCambiosContactos'), api('listAnomaliasAceptadas'), api('listFormularios')
     ]);
     renderPanel(); renderContactos(); renderExternos(); renderPlantillas();
-    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas(); renderMudanzas(); renderTarjetas(); renderPersonalEquipos(); renderMensajes(); renderRespuestasTipo(); renderAnomalias();
+    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas(); renderMudanzas(); renderTarjetas(); renderPersonalEquipos(); renderMensajes(); renderRespuestasTipo(); renderAnomalias(); renderFormularios(); renderCamposExtraLista();
   }catch(e){ /* el error ya se muestra en el banner */ }
 }
 cargarTodo();
@@ -2895,6 +2932,158 @@ async function rechazarCambio(historialId){
     const r = await api('rechazarCambioContacto', { historialId });
     alert('✔ Revertido a: ' + r.valorRestaurado);
     await cargarTodo();
+  }catch(e){}
+}
+
+// ========= FORMULARIOS DE INSCRIPCIÓN =========
+function renderCamposExtraLista(){
+  const cont = document.getElementById('fi-campos-extra-lista');
+  if (!camposExtraTemp.length){ cont.innerHTML = '<p class="empty">Sin campos extra agregados.</p>'; return; }
+  cont.innerHTML = camposExtraTemp.map((c,i)=>`<span class="tag" style="display:inline-flex;align-items:center;gap:6px;margin:2px 4px 2px 0;">${esc(c)} <button class="icon-btn" style="padding:1px 7px;" onclick="quitarCampoExtra(${i})">×</button></span>`).join('');
+}
+function agregarCampoExtra(){
+  const input = document.getElementById('fi-campo-extra-nuevo');
+  const valor = input.value.trim();
+  if (!valor) return;
+  camposExtraTemp.push(valor);
+  input.value = '';
+  renderCamposExtraLista();
+}
+function quitarCampoExtra(i){
+  camposExtraTemp.splice(i,1);
+  renderCamposExtraLista();
+}
+function limpiarFormularioInscripcion(){
+  document.getElementById('fi-id').value = '';
+  document.getElementById('fi-nombre').value = '';
+  document.getElementById('fi-tope').value = '0';
+  document.getElementById('fi-fecha-cierre').value = '';
+  document.getElementById('fi-descripcion').value = '';
+  camposExtraTemp = [];
+  renderCamposExtraLista();
+  document.getElementById('form-inscr-titulo').textContent = 'Nuevo formulario';
+}
+function cancelarEdicionFormulario(){ limpiarFormularioInscripcion(); }
+function editarFormulario(id){
+  const f = cacheFormularios.find(x=>String(x.id)===String(id));
+  if (!f) return;
+  document.getElementById('fi-id').value = f.id;
+  document.getElementById('fi-nombre').value = f.nombre;
+  document.getElementById('fi-tope').value = f.topeInscritos || 0;
+  document.getElementById('fi-fecha-cierre').value = f.fechaCierre ? isoAFechaLocal(f.fechaCierre) : '';
+  document.getElementById('fi-descripcion').value = f.descripcion || '';
+  try{ camposExtraTemp = JSON.parse(f.camposExtra || '[]'); }catch(e){ camposExtraTemp = []; }
+  renderCamposExtraLista();
+  document.getElementById('form-inscr-titulo').textContent = 'Editar formulario';
+  document.querySelector('#view-formularios .card').scrollIntoView({behavior:'smooth'});
+}
+async function guardarFormulario(boton){
+  if (!iniciarCarga(boton)) return;
+  const id = document.getElementById('fi-id').value;
+  const nombre = document.getElementById('fi-nombre').value;
+  if (!nombre){ finCarga(boton); return alert('Escribe el nombre de la actividad.'); }
+  const fechaCierreInput = document.getElementById('fi-fecha-cierre').value;
+  const payload = {
+    nombre,
+    topeInscritos: document.getElementById('fi-tope').value,
+    descripcion: document.getElementById('fi-descripcion').value,
+    camposExtra: JSON.stringify(camposExtraTemp),
+    fechaCierre: fechaCierreInput ? fechaCierreInput.replace('T',' ') : ''
+  };
+  try{
+    if (id){ payload.id = id; await api('updateFormulario', payload); }
+    else { await api('addFormulario', payload); }
+    limpiarFormularioInscripcion();
+    await cargarTodo();
+  } finally { finCarga(boton, '✔ Guardado'); }
+}
+async function cambiarEstadoFormulario(id, estado){
+  await api('updateFormulario', { id, estado });
+  await cargarTodo();
+}
+async function eliminarFormulario(id){
+  if (!confirm('¿Eliminar este formulario? Las inscripciones ya recibidas se conservan en el Sheets, pero deja de estar visible en el panel.')) return;
+  await api('deleteFormulario', { id });
+  await cargarTodo();
+}
+function linkInscripcion(f){
+  return CONFIG.APPS_SCRIPT_URL + '?action=inscripcion&slug=' + f.slug;
+}
+function copiarLinkFormulario(id){
+  const f = cacheFormularios.find(x=>String(x.id)===String(id));
+  if (!f) return;
+  navigator.clipboard.writeText(linkInscripcion(f)).then(()=>alert('✔ Link copiado:\n' + linkInscripcion(f)));
+}
+function renderFormularios(){
+  const cont = document.getElementById('tabla-formularios');
+  if (!cacheFormularios.length){ cont.innerHTML = '<p class="empty">Sin formularios creados aún.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Cupos</th><th>Estado</th><th>Cierre</th><th></th></tr>' +
+    cacheFormularios.map(f=>{
+      const inscritosCount = cacheInscripcionesPorFormulario(f.id).length;
+      const cuposTxt = Number(f.topeInscritos) > 0 ? `${inscritosCount} / ${f.topeInscritos}` : `${inscritosCount} (sin límite)`;
+      return `<tr>
+        <td>${esc(f.nombre)}</td>
+        <td class="mono">${cuposTxt}</td>
+        <td><span class="badge ${f.estado==='activo'?'enviada':'borrador'}">${esc(f.estado)}</span></td>
+        <td class="mono">${f.fechaCierre ? formatearFechaLocal(f.fechaCierre.replace(' ','T')) : '—'}</td>
+        <td>
+          <button class="icon-btn" onclick="verInscritos(${f.id})">Ver inscritos</button>
+          <button class="icon-btn" onclick="copiarLinkFormulario(${f.id})">🔗 Copiar link</button>
+          <button class="icon-btn" onclick="cambiarEstadoFormulario(${f.id}, '${f.estado==='activo'?'cerrado':'activo'}')">${f.estado==='activo'?'Cerrar':'Reactivar'}</button>
+          <button class="icon-btn" onclick="editarFormulario(${f.id})">Editar</button>
+          <button class="icon-btn" onclick="eliminarFormulario(${f.id})">Eliminar</button>
+        </td>
+      </tr>`;
+    }).join('') + '</table>';
+}
+function cacheInscripcionesPorFormulario(formularioId){
+  return (window._inscripcionesCache && window._inscripcionesCache[formularioId]) || [];
+}
+async function verInscritos(formularioId){
+  const f = cacheFormularios.find(x=>String(x.id)===String(formularioId));
+  if (!f) return;
+  const card = document.getElementById('card-inscritos');
+  const cont = document.getElementById('tabla-inscritos');
+  document.getElementById('inscritos-titulo').textContent = 'Inscritos — ' + f.nombre;
+  card.style.display = 'block';
+  cont.innerHTML = '<p class="empty">Cargando...</p>';
+  card.scrollIntoView({behavior:'smooth'});
+  try{
+    const inscritos = await api('listInscripciones', { formularioId });
+    window._inscripcionesCache = window._inscripcionesCache || {};
+    window._inscripcionesCache[formularioId] = inscritos;
+    renderFormularios(); // refresca el conteo de cupos
+
+    const barraAcciones = `<div style="margin-bottom:12px;">
+      <button class="icon-btn" onclick="generarPdfInscritosBtn(${formularioId})">📄 PDF</button>
+      <button class="icon-btn" onclick="generarExcelInscritosBtn(${formularioId})">📊 Excel</button>
+      <button class="icon-btn" onclick="enviarInscritosCorreoBtn(${formularioId}, 'pdf')">Enviar PDF por correo</button>
+      <button class="icon-btn" onclick="enviarInscritosCorreoBtn(${formularioId}, 'excel')">Enviar Excel por correo</button>
+    </div>`;
+
+    if (!inscritos.length){ cont.innerHTML = barraAcciones + '<p class="empty">Sin inscritos todavía.</p>'; return; }
+    cont.innerHTML = barraAcciones + '<table><tr><th>#</th><th>Unidad</th><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Otros datos</th><th>Fecha</th></tr>' +
+      inscritos.map((i,idx)=>{
+        let extra = {};
+        try{ extra = JSON.parse(i.camposExtraValores||'{}'); }catch(e){}
+        const extraTxt = Object.keys(extra).map(k=>k+': '+extra[k]).join(', ');
+        return `<tr><td class="mono">${idx+1}</td><td class="mono">${esc(i.unidad)}</td><td>${esc(i.nombre)} ${esc(i.apellido)}</td>
+        <td class="mono">${esc(i.telefono)}</td><td class="mono">${esc(i.correo)}</td><td>${esc(extraTxt)||'—'}</td><td class="mono">${esc(i.fecha)}</td></tr>`;
+      }).join('') + '</table>';
+  }catch(e){ cont.innerHTML = '<p class="empty">No se pudo cargar.</p>'; }
+}
+async function generarPdfInscritosBtn(formularioId){
+  try{ const r = await api('generarPdfInscripciones', { formularioId }); window.open(r.url, '_blank'); }catch(e){}
+}
+async function generarExcelInscritosBtn(formularioId){
+  try{ const r = await api('generarExcelInscripciones', { formularioId }); window.open(r.url, '_blank'); }catch(e){}
+}
+async function enviarInscritosCorreoBtn(formularioId, formato){
+  const destinatarios = prompt('¿A qué correo(s) enviar el listado en ' + (formato==='excel'?'Excel':'PDF') + '? (separa con coma si son varios)');
+  if (!destinatarios) return;
+  try{
+    const r = await api('enviarInscripcionesPorCorreo', { formularioId, destinatarios, formato });
+    alert(`✔ Enviado a ${r.enviados} de ${r.total} destinatario(s).`);
   }catch(e){}
 }
 
