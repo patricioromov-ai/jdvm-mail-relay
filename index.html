@@ -2815,12 +2815,37 @@ function renderAnomCambios(){
   if (!cont) return;
   const lista = cacheHistorialCambios.filter(h=>!estaAceptada('cambio:'+h.id)).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
   if (!lista.length){ cont.innerHTML = '<p class="empty">Sin cambios pendientes de revisar.</p>'; return; }
-  cont.innerHTML = '<table><tr><th></th><th>Fecha</th><th>Contacto</th><th>Campo</th><th>Antes</th><th>Después</th></tr>' +
-    lista.map(h=>`<tr><td>
-      <button class="icon-btn" onclick="aceptarAnomalia('cambio:${h.id}')">✔ Aceptar</button>
-      <button class="icon-btn" onclick="rechazarCambio(${h.id})">✘ Rechazar</button>
-    </td><td class="mono">${formatearFechaLocal(h.fecha)}</td><td>${esc(h.nombreContacto)}</td><td>${esc(h.campo)}</td>
-    <td>${esc(h.valorAnterior)}</td><td>${esc(h.valorNuevo)}</td></tr>`).join('') + '</table>';
+  cont.innerHTML =
+    '<div style="margin-bottom:10px;">' +
+      '<button class="icon-btn" onclick="marcarTodosCambios(true)">Marcar todos</button> ' +
+      '<button class="icon-btn" onclick="marcarTodosCambios(false)">Desmarcar todos</button> ' +
+      '<button class="btn-primary" style="margin-left:10px;" onclick="accionLoteCambios(\'aceptar\')">✔ Aceptar seleccionados</button> ' +
+      '<button class="icon-btn" onclick="accionLoteCambios(\'rechazar\')">✘ Rechazar seleccionados</button>' +
+    '</div>' +
+    '<table><tr><th></th><th>Fecha</th><th>Contacto</th><th>Campo</th><th>Antes</th><th>Después</th><th></th></tr>' +
+    lista.map(h=>`<tr>
+      <td><input type="checkbox" class="cambio-check" data-id="${h.id}"></td>
+      <td class="mono">${formatearFechaLocal(h.fecha)}</td><td>${esc(h.nombreContacto)}</td><td>${esc(h.campo)}</td>
+      <td>${esc(h.valorAnterior)}</td><td>${esc(h.valorNuevo)}</td>
+      <td>
+        <button class="icon-btn" onclick="aceptarAnomalia('cambio:${h.id}')">✔ Aceptar</button>
+        <button class="icon-btn" onclick="rechazarCambio(${h.id})">✘ Rechazar</button>
+      </td>
+    </tr>`).join('') + '</table>';
+}
+function marcarTodosCambios(valor){
+  document.querySelectorAll('.cambio-check').forEach(chk=>chk.checked=valor);
+}
+async function accionLoteCambios(accion){
+  const ids = Array.from(document.querySelectorAll('.cambio-check:checked')).map(chk=>chk.dataset.id);
+  if (!ids.length) return alert('No marcaste ningún cambio.');
+  const verbo = accion==='aceptar' ? 'aceptar' : 'rechazar (revertir al valor anterior)';
+  if (!confirm(`¿${accion==='aceptar'?'Aceptar':'Rechazar'} ${ids.length} cambio(s) seleccionados? Se va a ${verbo} cada uno.`)) return;
+  for (const id of ids) {
+    if (accion === 'aceptar') await api('aceptarAnomalia', { firma: 'cambio:'+id });
+    else await api('rechazarCambioContacto', { historialId: id });
+  }
+  await cargarTodo();
 }
 async function rechazarCambio(historialId){
   if (!confirm('¿Rechazar este cambio? El campo vuelve a su valor anterior.')) return;
