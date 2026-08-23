@@ -3007,7 +3007,7 @@ async function eliminarFormulario(id){
   await cargarTodo();
 }
 function linkInscripcion(f){
-  return CONFIG.APPS_SCRIPT_URL + '?action=inscripcion&slug=' + f.slug;
+  return f.linkCorto || (CONFIG.APPS_SCRIPT_URL + '?action=inscripcion&slug=' + f.slug);
 }
 function copiarLinkFormulario(id){
   const f = cacheFormularios.find(x=>String(x.id)===String(id));
@@ -3017,7 +3017,7 @@ function copiarLinkFormulario(id){
 function renderFormularios(){
   const cont = document.getElementById('tabla-formularios');
   if (!cacheFormularios.length){ cont.innerHTML = '<p class="empty">Sin formularios creados aún.</p>'; return; }
-  cont.innerHTML = '<table><tr><th>Nombre</th><th>Cupos</th><th>Estado</th><th>Cierre</th><th></th></tr>' +
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Cupos</th><th>Estado</th><th>Cierre</th><th>Link</th><th></th></tr>' +
     cacheFormularios.map(f=>{
       const inscritosCount = cacheInscripcionesPorFormulario(f.id).length;
       const cuposTxt = Number(f.topeInscritos) > 0 ? `${inscritosCount} / ${f.topeInscritos}` : `${inscritosCount} (sin límite)`;
@@ -3026,6 +3026,7 @@ function renderFormularios(){
         <td class="mono">${cuposTxt}</td>
         <td><span class="badge ${f.estado==='activo'?'enviada':'borrador'}">${esc(f.estado)}</span></td>
         <td class="mono">${f.fechaCierre ? formatearFechaLocal(f.fechaCierre.replace(' ','T')) : '—'}</td>
+        <td class="mono"><a href="${esc(linkInscripcion(f))}" target="_blank">${esc(linkInscripcion(f))}</a></td>
         <td>
           <button class="icon-btn" onclick="verInscritos(${f.id})">Ver inscritos</button>
           <button class="icon-btn" onclick="copiarLinkFormulario(${f.id})">🔗 Copiar link</button>
