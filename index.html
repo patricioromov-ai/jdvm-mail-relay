@@ -3016,6 +3016,14 @@ async function eliminarFormulario(id){
 function linkInscripcion(f){
   return f.linkCorto || (CONFIG.APPS_SCRIPT_URL + '?action=inscripcion&slug=' + f.slug);
 }
+async function regenerarLinkFormularioBtn(id){
+  if (!confirm('¿Regenerar el link corto de este formulario? El link anterior deja de funcionar.')) return;
+  try{
+    const r = await api('regenerarLinkFormulario', { id });
+    alert('✔ Nuevo link: ' + r.linkCorto);
+    await cargarTodo();
+  }catch(e){}
+}
 function copiarLinkFormulario(id){
   const f = cacheFormularios.find(x=>String(x.id)===String(id));
   if (!f) return;
@@ -3040,6 +3048,7 @@ function renderFormularios(){
         <td>
           <button class="icon-btn" onclick="verInscritos(${f.id})">Ver inscritos</button>
           <button class="icon-btn" onclick="copiarLinkFormulario(${f.id})">🔗 Copiar link</button>
+          <button class="icon-btn" onclick="regenerarLinkFormularioBtn(${f.id})">🔄 Regenerar link</button>
           <button class="icon-btn" onclick="cambiarEstadoFormulario(${f.id}, '${f.estado==='activo'?'cerrado':'activo'}')">${f.estado==='activo'?'Cerrar':'Reactivar'}</button>
           <button class="icon-btn" onclick="editarFormulario(${f.id})">Editar</button>
           <button class="icon-btn" onclick="eliminarFormulario(${f.id})">Eliminar</button>
