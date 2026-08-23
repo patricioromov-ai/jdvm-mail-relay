@@ -221,12 +221,15 @@
           <div class="filtro-tab" data-filtro-torre="B" onclick="filtrarPorTorre('B', this)"><span class="torre-tab b"></span>Torre B</div>
           <div class="filtro-tab" data-filtro-torre="C" onclick="filtrarPorTorre('C', this)"><span class="torre-tab c"></span>Torre C</div>
           <div class="filtro-tab" data-filtro-torre="D" onclick="filtrarPorTorre('D', this)"><span class="torre-tab d"></span>Torre D</div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;border:1px solid var(--line);padding:6px 12px;border-radius:20px;background:#fff;cursor:pointer;margin-left:6px;">
-            <input type="checkbox" id="filtro-estacionamiento" onchange="renderContactos()"> Solo con estacionamiento
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;border:1px solid var(--line);padding:6px 12px;border-radius:20px;background:#fff;cursor:pointer;">
-            <input type="checkbox" id="filtro-bodega" onchange="renderContactos()"> Solo con bodega
-          </label>
+          <select id="filtro-est-bod" onchange="renderContactos()" style="padding:6px 10px;border:1px solid var(--line);border-radius:20px;font-size:0.83rem;background:#fff;margin-left:6px;">
+            <option value="">Estacionamiento/bodega: todos</option>
+            <option value="con_est">Con estacionamiento</option>
+            <option value="con_bod">Con bodega</option>
+            <option value="solo_bod">Solo bodega (sin estacionamiento)</option>
+            <option value="solo_est">Solo estacionamiento (sin bodega)</option>
+            <option value="con_alguno">Con estacionamiento o bodega</option>
+            <option value="sin_ninguno">Sin estacionamiento ni bodega</option>
+          </select>
         </div>
         <div id="tabla-contactos"><p class="empty">Cargando...</p></div>
       </div>
@@ -1025,13 +1028,18 @@ function renderContactos(){
   if (!cacheContactos.length){ cont.innerHTML = '<p class="empty">Sin contactos aún. Agrega el primero arriba.</p>'; return; }
 
   const busqueda = (document.getElementById('buscar-contactos')?.value || '').toLowerCase().trim();
-  const soloConEstacionamiento = document.getElementById('filtro-estacionamiento')?.checked;
-  const soloConBodega = document.getElementById('filtro-bodega')?.checked;
+  const filtroEstBod = document.getElementById('filtro-est-bod')?.value || '';
   let lista = cacheContactos;
   if (filtroTipoActual) lista = lista.filter(c => c.tipo === filtroTipoActual);
   if (filtroTorreActual) lista = lista.filter(c => c.torre === filtroTorreActual);
-  if (soloConEstacionamiento) lista = lista.filter(c => c.estacionamiento && String(c.estacionamiento).trim());
-  if (soloConBodega) lista = lista.filter(c => c.bodega && String(c.bodega).trim());
+  const tieneEst = c => !!(c.estacionamiento && String(c.estacionamiento).trim());
+  const tieneBod = c => !!(c.bodega && String(c.bodega).trim());
+  if (filtroEstBod === 'con_est') lista = lista.filter(c => tieneEst(c));
+  else if (filtroEstBod === 'con_bod') lista = lista.filter(c => tieneBod(c));
+  else if (filtroEstBod === 'solo_bod') lista = lista.filter(c => tieneBod(c) && !tieneEst(c));
+  else if (filtroEstBod === 'solo_est') lista = lista.filter(c => tieneEst(c) && !tieneBod(c));
+  else if (filtroEstBod === 'con_alguno') lista = lista.filter(c => tieneEst(c) || tieneBod(c));
+  else if (filtroEstBod === 'sin_ninguno') lista = lista.filter(c => !tieneEst(c) && !tieneBod(c));
   if (busqueda){
     lista = lista.filter(c => Object.values(c).some(v => String(v||'').toLowerCase().includes(busqueda)));
   }
