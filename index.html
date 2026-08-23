@@ -1231,7 +1231,8 @@ async function importarCSV(evento){
     torre: (f.torre || f.Torre || '').toUpperCase(),
     tipo: (f.tipo || f.Tipo || 'propietario').toLowerCase(),
     telefono: f.telefono || f.Telefono || f['Teléfono'] || '',
-    unidad: f.unidad || f.Unidad || ''
+    unidad: f.unidad || f.Unidad || '',
+    rut: f.rut || f.RUT || f.Rut || ''
   })).filter(c => c.nombre && c.email);
 
   if (!contactos.length) return alert('No se encontraron filas válidas (revisa que tenga columnas nombre y email).');
