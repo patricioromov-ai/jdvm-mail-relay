@@ -168,6 +168,8 @@
           <input type="file" id="csv-update-input" accept=".csv" style="display:none;" onchange="importarActualizacionEstBod(event)">
           <button class="icon-btn" onclick="document.getElementById('csv-cruce-input').click()">🔍 Cruce con archivo actualizado</button>
           <input type="file" id="csv-cruce-input" accept=".csv" style="display:none;" onchange="importarCruceUnidad(event)">
+          <button class="icon-btn" onclick="document.getElementById('csv-rut-input').click()">🪪 Importar RUT</button>
+          <input type="file" id="csv-rut-input" accept=".csv" style="display:none;" onchange="importarRutMasivo(event)">
           <button class="icon-btn" onclick="toggleForm('form-contacto')">＋ Nuevo contacto</button>
         </div>
       </div>
@@ -179,6 +181,7 @@
         <div class="form-grid">
           <div class="form-row"><label>Nombre</label><input type="text" id="c-nombre"></div>
           <div class="form-row"><label>Email</label><input type="email" id="c-email"></div>
+          <div class="form-row"><label>RUT</label><input type="text" id="c-rut" placeholder="12.345.678-9"></div>
           <div class="form-row"><label>Torre</label>
             <select id="c-torre"><option>A</option><option>B</option><option>C</option><option>D</option></select>
           </div>
@@ -646,6 +649,11 @@
       </div>
 
       <div class="card">
+        <h3>Contactos duplicados (mismo RUT)</h3>
+        <div id="anom-duplicados-rut"><p class="empty">Cargando...</p></div>
+      </div>
+
+      <div class="card">
         <h3>Datos inconsistentes</h3>
         <div id="anom-inconsistentes"><p class="empty">Cargando...</p></div>
       </div>
@@ -1031,8 +1039,8 @@ function renderContactos(){
   if (!lista.length){ cont.innerHTML = '<p class="empty">No hay contactos que coincidan con la búsqueda.</p>'; return; }
 
   cont.innerHTML = `<p class="empty" style="margin-bottom:8px;">${lista.length} de ${cacheContactos.length} contactos</p>` +
-    '<table><tr><th>Nombre</th><th>Torre</th><th>Unidad</th><th>Estacionamiento</th><th>Bodega</th><th>Tipo</th><th>Email</th><th></th></tr>' +
-    lista.map(c=>`<tr><td>${esc(c.nombre)}</td><td><span class="torre-tab ${String(c.torre).toLowerCase()}"></span>${esc(c.torre)}</td>
+    '<table><tr><th>Nombre</th><th>RUT</th><th>Torre</th><th>Unidad</th><th>Estacionamiento</th><th>Bodega</th><th>Tipo</th><th>Email</th><th></th></tr>' +
+    lista.map(c=>`<tr><td>${esc(c.nombre)}</td><td class="mono">${esc(c.rut)||'—'}</td><td><span class="torre-tab ${String(c.torre).toLowerCase()}"></span>${esc(c.torre)}</td>
     <td class="mono">${esc(c.unidad)||'—'}</td>
     <td class="mono">${esc(c.estacionamiento)||'—'}</td>
     <td class="mono">${esc(c.bodega)||'—'}</td>
@@ -1050,6 +1058,7 @@ function editarContacto(id){
   document.getElementById('c-id').value = c.id;
   document.getElementById('c-nombre').value = c.nombre;
   document.getElementById('c-email').value = c.email;
+  document.getElementById('c-rut').value = c.rut || '';
   document.getElementById('c-torre').value = c.torre;
   document.getElementById('c-tipo').value = c.tipo;
   document.getElementById('c-telefono').value = c.telefono || '';
@@ -1070,6 +1079,7 @@ function cancelarEdicionContacto(){
   document.getElementById('c-id').value = '';
   document.getElementById('c-nombre').value = '';
   document.getElementById('c-email').value = '';
+  document.getElementById('c-rut').value = '';
   document.getElementById('c-telefono').value = '';
   document.getElementById('c-unidad').value = '';
   document.getElementById('c-estacionamiento').value = '';
@@ -1084,6 +1094,7 @@ async function guardarContacto(boton){
   const payload = {
     nombre: document.getElementById('c-nombre').value,
     email: document.getElementById('c-email').value,
+    rut: document.getElementById('c-rut').value,
     torre: document.getElementById('c-torre').value,
     tipo: document.getElementById('c-tipo').value,
     telefono: document.getElementById('c-telefono').value,
@@ -1249,6 +1260,21 @@ async function importarActualizacionEstBod(evento){
   evento.target.value = '';
 }
 
+async function importarRutMasivo(evento){
+  const file = evento.target.files[0];
+  if (!file) return;
+  const texto = await file.text();
+  const filas = parseCSV(texto);
+  const actualizaciones = filas.map(f => ({ email: f.email || '', rut: f.rut || '' })).filter(a => a.email && a.rut);
+  if (!actualizaciones.length) return alert('No se encontraron filas válidas (columnas esperadas: email, rut).');
+  if (!confirm(`Se completará el RUT de hasta ${actualizaciones.length} contactos (solo si coincide el email). ¿Continuar?`)) return;
+  try{
+    const r = await api('actualizarRutPorEmail', { actualizaciones });
+    alert(`✔ RUT actualizado en ${r.actualizados} de ${r.total} contactos.`);
+    await cargarTodo();
+  }catch(e){}
+  evento.target.value = '';
+}
 async function importarCruceUnidad(evento){
   const file = evento.target.files[0];
   if (!file) return;
@@ -2694,9 +2720,28 @@ async function aceptarAnomalia(firma, detalle){
 }
 function renderAnomalias(){
   renderAnomDuplicados();
+  renderAnomDuplicadosRut();
   renderAnomInconsistentes();
   renderAnomUnidades();
   renderAnomCambios();
+}
+function renderAnomDuplicadosRut(){
+  const cont = document.getElementById('anom-duplicados-rut');
+  if (!cont) return;
+  const grupos = {};
+  cacheContactos.filter(c=>c.tipo!=='corredor').forEach(c=>{
+    const rut = String(c.rut||'').toUpperCase().replace(/\./g,'').trim();
+    if (!rut) return;
+    (grupos[rut] = grupos[rut] || []).push(c);
+  });
+  const duplicados = Object.entries(grupos).filter(([rut,lista])=>lista.length>1 && !estaAceptada('duprut:'+rut));
+  if (!duplicados.length){ cont.innerHTML = '<p class="empty">Sin duplicados detectados.</p>'; return; }
+  cont.innerHTML = `<p class="empty" style="margin-bottom:8px;">${duplicados.length} RUT repetido(s)</p>` +
+    '<table><tr><th></th><th>RUT</th><th>Contactos</th></tr>' +
+    duplicados.map(([rut,lista])=>`<tr>
+      <td><button class="icon-btn" onclick="aceptarAnomalia('duprut:${rut}','${esc(rut)}')">✔ Aceptar</button></td>
+      <td class="mono">${esc(rut)}</td><td>${lista.map(c=>esc(c.nombre)+' ('+esc(c.torre)+'/'+esc(c.unidad)+', '+esc(c.tipo)+')').join('<br>')}</td></tr>`).join('') +
+    '</table>';
 }
 function renderAnomDuplicados(){
   const cont = document.getElementById('anom-duplicados');
