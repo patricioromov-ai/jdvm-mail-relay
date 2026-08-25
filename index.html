@@ -616,6 +616,7 @@
             <div class="form-row"><label>Filtrar por estado</label>
               <select id="tar-filtro-estado" onchange="renderTarjetas()">
                 <option value="">Todos (activas)</option>
+                <option value="pendiente_pago">Pendiente de pago</option>
                 <option value="solicitada">Solicitada</option>
                 <option value="en_proceso">En proceso</option>
                 <option value="lista_entrega">Lista para entrega</option>
@@ -2559,8 +2560,13 @@ async function enviarTarjetaCorreoBtn(id){
     alert(`✔ Enviado a ${r.enviados} de ${r.total} destinatario(s).`);
   }catch(e){}
 }
+async function marcarPagadoTarjeta(id){
+  if (!confirm('¿Marcar como pagado? La solicitud pasa automáticamente a estado "solicitada".')) return;
+  await api('updateTarjeta', { id, pagado: 'SI', estado: 'solicitada' });
+  await cargarTodo();
+}
 function badgeEstadoTarjeta(estado){
-  const mapa = { solicitada:'programada', en_proceso:'borrador', lista_entrega:'enviando', completada:'enviada', rechazada:'err' };
+  const mapa = { pendiente_pago:'err', solicitada:'programada', en_proceso:'borrador', lista_entrega:'enviando', completada:'enviada', rechazada:'err' };
   return `<span class="badge ${mapa[estado]||'borrador'}">${esc(estado)}</span>`;
 }
 function renderTarjetas(){
@@ -2574,7 +2580,9 @@ function renderTarjetas(){
   if (!lista.length){ cont.innerHTML = '<p class="empty">Sin solicitudes activas.</p>'; return; }
 
   cont.innerHTML = '<table><tr><th>Torre/Depto</th><th>Nombre</th><th>Motivo</th><th>Pagado</th><th>Fecha solicitud</th><th>Estado</th><th>Checklist</th><th></th></tr>' +
-    lista.map(t=>`<tr>
+    lista.map(t=>{
+      const noPagado = String(t.pagado||'').toUpperCase() !== 'SI';
+      return `<tr>
       <td>${t.torre ? '<span class="torre-tab '+String(t.torre).toLowerCase()+'"></span>'+esc(t.torre)+' / ' : ''}${esc(t.depto)||'—'}</td>
       <td>${esc(t.nombre)}${t.tipo==='personal' ? ' <span class="mono" style="color:var(--pending);">(personal)</span>' : ''}</td>
       <td>${esc(t.motivo)}${t.comentario ? '<br><span class="mono" style="color:var(--pending);">'+esc(t.comentario)+'</span>' : ''}</td>
@@ -2583,6 +2591,7 @@ function renderTarjetas(){
       <td>${badgeEstadoTarjeta(t.estado)}</td>
       <td>${t.entregadoPor ? '✔ Entregada ('+esc(t.entregadoPor)+')' : '☐ Sin entregar'}<br>${t.recepcionadoPor ? '✔ Recibida ('+esc(t.recepcionadoPor)+')' : '☐ Sin recepción'}</td>
       <td>
+        ${noPagado ? `<button class="icon-btn" onclick="marcarPagadoTarjeta(${t.id})">💰 Marcar pagado</button>` : ''}
         ${!t.entregadoPor ? `<button class="icon-btn" onclick="confirmarEntregaTarjeta(${t.id})">Confirmar entrega</button>` : ''}
         ${!t.recepcionadoPor ? `<button class="icon-btn" onclick="confirmarRecepcionTarjeta(${t.id})">Confirmar recepción</button>` : ''}
         <button class="icon-btn" onclick="generarPdfTarjetaBtn(${t.id})">📄 PDF</button>
@@ -2590,7 +2599,8 @@ function renderTarjetas(){
         <button class="icon-btn" onclick="editarTarjeta(${t.id})">Editar</button>
         <button class="icon-btn" onclick="eliminarTarjeta(${t.id})">Rechazar</button>
       </td>
-    </tr>`).join('') + '</table>';
+    </tr>`;
+    }).join('') + '</table>';
 
   const historial = document.getElementById('historial-tarjetas');
   if (historial && historial.style.display !== 'none') renderHistorialTarjetas();
