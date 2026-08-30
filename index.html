@@ -2638,7 +2638,7 @@ function filaTarjetaHtml(t){
   const esNueva = t.tokenUsado === 'si' && t.revisadoPorAdmin !== 'si';
   return `<tr>
       <td>${t.torre ? '<span class="torre-tab '+String(t.torre).toLowerCase()+'"></span>'+esc(t.torre)+' / ' : ''}${esc(t.depto)||'—'}</td>
-      <td>${esc(t.nombre)}${t.tipo==='personal' ? ' <span class="mono" style="color:var(--pending);">(personal)</span>' : ''}${t.correo ? '<br><span class="mono" style="color:var(--pending);">'+esc(t.correo)+'</span>' : ''}</td>
+      <td>${esc(t.nombre)}${t.tipo==='personal' ? ' <span class="mono" style="color:var(--pending);">(personal)</span>' : ''}${t.correo ? '<br><span class="mono" style="color:var(--pending);">'+esc(t.correo)+'</span>' : ''}${t.comprobantePagoUrl ? '<br><a href="'+esc(t.comprobantePagoUrl)+'" target="_blank">📎 Comprobante</a>' : ''}</td>
       <td>${esc(t.motivo)}${t.comentario ? '<br><span class="mono" style="color:var(--pending);">'+esc(t.comentario)+'</span>' : ''}</td>
       <td>${esc(t.pagado)}</td>
       <td class="mono">${esc(t.fechaSolicitud)||'—'}</td>
