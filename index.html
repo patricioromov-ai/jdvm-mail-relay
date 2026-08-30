@@ -585,7 +585,14 @@
 
       <div id="sub-tarjetas-solicitudes">
         <div class="card">
-          <h3 id="tar-form-titulo">Nueva solicitud</h3>
+          <h3>Solicitar tarjeta a un residente</h3>
+          <p class="empty" style="margin-bottom:10px;">Genera el link al toque y envíaselo — el residente completa sus propios datos al abrirlo.</p>
+          <button class="btn-primary" onclick="generarLinkSolicitudRapida()">🔗 Generar link para nueva solicitud</button>
+          <button class="icon-btn" onclick="toggleFormularioManualTarjeta()">＋ Crear solicitud manual (con datos que ya tengo)</button>
+        </div>
+
+        <div class="card" id="form-manual-tarjeta-card" style="display:none;">
+          <h3 id="tar-form-titulo">Nueva solicitud (manual)</h3>
           <input type="hidden" id="tar-id">
           <div class="form-grid">
             <div class="form-row"><label>Tipo</label>
@@ -613,6 +620,11 @@
           <div class="form-row"><label>Comentario</label><input type="text" id="tar-comentario"></div>
           <button class="btn-primary" onclick="guardarTarjeta(this)">Guardar solicitud</button>
           <button class="icon-btn" onclick="cancelarEdicionTarjeta()">Cancelar</button>
+        </div>
+
+        <div class="card">
+          <h3>Nuevas solicitudes <span class="empty" style="font-weight:400;">(llegaron por el link, sin revisar)</span></h3>
+          <div id="tabla-nuevas-tarjetas"><p class="empty">Cargando...</p></div>
         </div>
 
         <div class="card">
@@ -2491,6 +2503,27 @@ function cambiarSubTarjetas(cual, elemento){
   document.getElementById('sub-tarjetas-personal').style.display = cual==='personal' ? 'block':'none';
 }
 
+function toggleFormularioManualTarjeta(){
+  const card = document.getElementById('form-manual-tarjeta-card');
+  card.style.display = card.style.display === 'none' ? 'block' : 'none';
+  if (card.style.display === 'block') card.scrollIntoView({behavior:'smooth'});
+}
+async function generarLinkSolicitudRapida(){
+  try{
+    const nueva = await api('crearSolicitudRapida');
+    const destinatario = prompt('¿A qué correo enviar el link? (déjalo vacío y presiona Aceptar para solo copiarlo, ej. para WhatsApp)');
+    if (destinatario){
+      const r = await api('enviarFormularioTarjetaPorCorreo', { id: nueva.id, destinatario });
+      if (r.enviado) alert('✔ Link enviado a ' + destinatario);
+      else alert('✘ No se pudo enviar el correo. Link generado igual:\n' + r.url);
+    } else {
+      const r = await api('generarTokenTarjeta', { id: nueva.id });
+      navigator.clipboard.writeText(r.url).then(()=>{}).catch(()=>{});
+      alert('✔ Link de un solo uso (ya copiado al portapapeles):\n' + r.url);
+    }
+    await cargarTodo();
+  }catch(e){}
+}
 function limpiarFormularioTarjeta(){
   document.getElementById('tar-id').value = '';
   document.getElementById('tar-tipo').value = 'residente';
@@ -2600,40 +2633,56 @@ function badgeEstadoTarjeta(estado){
   const mapa = { pendiente_pago:'err', solicitada:'programada', en_proceso:'borrador', lista_entrega:'enviando', completada:'enviada', rechazada:'err' };
   return `<span class="badge ${mapa[estado]||'borrador'}">${esc(estado)}</span>`;
 }
-function renderTarjetas(){
-  const cont = document.getElementById('tabla-tarjetas');
-  const filtroTorre = document.getElementById('tar-filtro-torre')?.value || '';
-  const filtroEstado = document.getElementById('tar-filtro-estado')?.value || '';
-  let lista = cacheTarjetas.filter(t => t.estado!=='completada' && t.estado!=='rechazada');
-  if (filtroTorre) lista = lista.filter(t=>t.torre===filtroTorre);
-  if (filtroEstado) lista = lista.filter(t=>t.estado===filtroEstado);
-
-  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin solicitudes activas.</p>'; return; }
-
-  cont.innerHTML = '<table><tr><th>Torre/Depto</th><th>Nombre</th><th>Motivo</th><th>Pagado</th><th>Fecha solicitud</th><th>Estado</th><th>Checklist</th><th></th></tr>' +
-    lista.map(t=>{
-      const noPagado = String(t.pagado||'').toUpperCase() !== 'SI';
-      return `<tr>
+function filaTarjetaHtml(t){
+  const noPagado = String(t.pagado||'').toUpperCase() !== 'SI';
+  const esNueva = t.tokenUsado === 'si' && t.revisadoPorAdmin !== 'si';
+  return `<tr>
       <td>${t.torre ? '<span class="torre-tab '+String(t.torre).toLowerCase()+'"></span>'+esc(t.torre)+' / ' : ''}${esc(t.depto)||'—'}</td>
-      <td>${esc(t.nombre)}${t.tipo==='personal' ? ' <span class="mono" style="color:var(--pending);">(personal)</span>' : ''}</td>
+      <td>${esc(t.nombre)}${t.tipo==='personal' ? ' <span class="mono" style="color:var(--pending);">(personal)</span>' : ''}${t.correo ? '<br><span class="mono" style="color:var(--pending);">'+esc(t.correo)+'</span>' : ''}</td>
       <td>${esc(t.motivo)}${t.comentario ? '<br><span class="mono" style="color:var(--pending);">'+esc(t.comentario)+'</span>' : ''}</td>
       <td>${esc(t.pagado)}</td>
       <td class="mono">${esc(t.fechaSolicitud)||'—'}</td>
       <td>${badgeEstadoTarjeta(t.estado)}</td>
       <td>${t.entregadoPor ? '✔ Entregada ('+esc(t.entregadoPor)+')' : '☐ Sin entregar'}<br>${t.recepcionadoPor ? '✔ Recibida ('+esc(t.recepcionadoPor)+')' : '☐ Sin recepción'}</td>
       <td>
+        ${esNueva ? `<button class="icon-btn" onclick="marcarRevisadaTarjeta(${t.id})">✔ Marcar revisada</button>` : ''}
         ${noPagado ? `<button class="icon-btn" onclick="marcarPagadoTarjeta(${t.id})">💰 Marcar pagado</button>` : ''}
         ${!t.entregadoPor ? `<button class="icon-btn" onclick="confirmarEntregaTarjeta(${t.id})">Confirmar entrega</button>` : ''}
         ${!t.recepcionadoPor ? `<button class="icon-btn" onclick="confirmarRecepcionTarjeta(${t.id})">Confirmar recepción</button>` : ''}
         <button class="icon-btn" onclick="generarPdfTarjetaBtn(${t.id})">📄 PDF</button>
         <button class="icon-btn" onclick="enviarTarjetaCorreoBtn(${t.id})">Enviar correo</button>
-        <button class="icon-btn" onclick="enviarFormularioDatosBtn(${t.id})">📨 Enviar formulario de datos</button>
-        <button class="icon-btn" onclick="generarLinkFormularioBtn(${t.id})">🔗 Generar link (WhatsApp)</button>
+        ${!t.tokenUsado || t.tokenUsado!=='si' ? `<button class="icon-btn" onclick="enviarFormularioDatosBtn(${t.id})">📨 Enviar formulario de datos</button>
+        <button class="icon-btn" onclick="generarLinkFormularioBtn(${t.id})">🔗 Generar link (WhatsApp)</button>` : ''}
         <button class="icon-btn" onclick="editarTarjeta(${t.id})">Editar</button>
         <button class="icon-btn" onclick="eliminarTarjeta(${t.id})">Rechazar</button>
       </td>
     </tr>`;
-    }).join('') + '</table>';
+}
+async function marcarRevisadaTarjeta(id){
+  await api('updateTarjeta', { id, revisadoPorAdmin: 'si' });
+  await cargarTodo();
+}
+function renderNuevasTarjetas(){
+  const cont = document.getElementById('tabla-nuevas-tarjetas');
+  const lista = cacheTarjetas.filter(t => t.tokenUsado === 'si' && t.revisadoPorAdmin !== 'si');
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin solicitudes nuevas por revisar.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Torre/Depto</th><th>Nombre</th><th>Motivo</th><th>Pagado</th><th>Fecha solicitud</th><th>Estado</th><th>Checklist</th><th></th></tr>' +
+    lista.map(filaTarjetaHtml).join('') + '</table>';
+}
+function renderTarjetas(){
+  const cont = document.getElementById('tabla-tarjetas');
+  const filtroTorre = document.getElementById('tar-filtro-torre')?.value || '';
+  const filtroEstado = document.getElementById('tar-filtro-estado')?.value || '';
+  let lista = cacheTarjetas.filter(t => t.estado!=='completada' && t.estado!=='rechazada' && !(t.tokenUsado==='si' && t.revisadoPorAdmin!=='si'));
+  if (filtroTorre) lista = lista.filter(t=>t.torre===filtroTorre);
+  if (filtroEstado) lista = lista.filter(t=>t.estado===filtroEstado);
+
+  renderNuevasTarjetas();
+
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin solicitudes activas.</p>'; return; }
+
+  cont.innerHTML = '<table><tr><th>Torre/Depto</th><th>Nombre</th><th>Motivo</th><th>Pagado</th><th>Fecha solicitud</th><th>Estado</th><th>Checklist</th><th></th></tr>' +
+    lista.map(filaTarjetaHtml).join('') + '</table>';
 
   const historial = document.getElementById('historial-tarjetas');
   if (historial && historial.style.display !== 'none') renderHistorialTarjetas();
