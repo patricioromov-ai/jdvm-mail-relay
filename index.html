@@ -503,6 +503,13 @@
       </div>
 
       <div class="card">
+        <h3>Formulario público de autoservicio</h3>
+        <p class="empty" style="margin-bottom:10px;">Link permanente (no de un solo uso) para que cualquier residente agende su propia mudanza, viendo los horarios disponibles y adjuntando el comprobante de pago. Queda con estado "pendiente" hasta que la apruebes.</p>
+        <button class="icon-btn" onclick="verLinkFormularioMudanza()">🔗 Ver/copiar link</button>
+        <div id="link-mudanza-publico" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="card">
         <h3 id="mud-form-titulo">Nueva mudanza</h3>
         <input type="hidden" id="mud-id">
         <input type="hidden" id="mud-contacto-id">
@@ -2225,6 +2232,14 @@ function buscarContactosOrigen(){
   sel.innerHTML = '<option value="">Selecciona quién se traslada</option>' +
     candidatos.map(c=>`<option value="${c.id}">${esc(c.nombre)} (${esc(c.tipo)})</option>`).join('');
 }
+async function verLinkFormularioMudanza(){
+  const cont = document.getElementById('link-mudanza-publico');
+  cont.innerHTML = '<p class="empty">Generando...</p>';
+  try{
+    const r = await api('obtenerLinkFormularioMudanza');
+    cont.innerHTML = `<a href="${esc(r.url)}" target="_blank" class="mono">${esc(r.url)}</a> <button class="icon-btn" onclick="navigator.clipboard.writeText('${esc(r.url)}')">Copiar</button>`;
+  }catch(e){ cont.innerHTML = '<p class="empty">No se pudo generar el link.</p>'; }
+}
 function calcularHoraTermino(){
   const inicio = document.getElementById('mud-hora-inicio').value;
   if (!inicio) return;
@@ -2395,7 +2410,7 @@ function renderMudanzas(){
       <td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}${m.excepcionHorario==='si' ? '<br><span class="badge borrador" title="Fuera del horario habitual">⚠ Excepción</span>' : ''}</td>
       <td><span class="torre-tab ${String(m.torre).toLowerCase()}"></span>${esc(m.torre)} / ${esc(m.unidad)}</td>
       <td>${labelTipoMudanza(m.tipo)}</td>
-      <td>${esc(m.nombreResponsable)}${m.vehiculoPatente ? '<br><span class="mono" style="color:var(--pending);">'+esc(m.vehiculoPatente)+'</span>' : ''}</td>
+      <td>${esc(m.nombreResponsable)}${m.vehiculoPatente ? '<br><span class="mono" style="color:var(--pending);">'+esc(m.vehiculoPatente)+'</span>' : ''}${m.comprobantePagoUrl ? '<br><a href="'+esc(m.comprobantePagoUrl)+'" target="_blank">📎 Comprobante</a>' : ''}</td>
       <td>Admin: ${chip(m.aprobacionAdmin)}<br>Dueño: ${chip(m.aprobacionDueno)}</td>
       <td>
         ${m.aprobacionAdmin!=='aprobado' ? `<button class="icon-btn" onclick="aprobarMudanza(${m.id},'aprobacionAdmin','aprobado')">Aprobar admin</button>` : ''}
@@ -2537,6 +2552,22 @@ async function cambiarEstadoTarjeta(id, estado){
   await api('updateTarjeta', { id, estado });
   await cargarTodo();
 }
+async function enviarFormularioDatosBtn(id){
+  const destinatario = prompt('¿A qué correo enviar el formulario de datos?');
+  if (!destinatario) return;
+  try{
+    const r = await api('enviarFormularioTarjetaPorCorreo', { id, destinatario });
+    if (r.enviado) alert('✔ Formulario enviado a ' + destinatario);
+    else alert('✘ No se pudo enviar el correo. Link generado igual:\n' + r.url);
+  }catch(e){}
+}
+async function generarLinkFormularioBtn(id){
+  try{
+    const r = await api('generarTokenTarjeta', { id });
+    navigator.clipboard.writeText(r.url).then(()=>{}).catch(()=>{});
+    alert('✔ Link de un solo uso (ya copiado al portapapeles):\n' + r.url);
+  }catch(e){}
+}
 async function confirmarEntregaTarjeta(id){
   const quien = prompt('¿Quién entrega la tarjeta (nombre de administración/conserjería)?');
   if (!quien) return;
@@ -2596,6 +2627,8 @@ function renderTarjetas(){
         ${!t.recepcionadoPor ? `<button class="icon-btn" onclick="confirmarRecepcionTarjeta(${t.id})">Confirmar recepción</button>` : ''}
         <button class="icon-btn" onclick="generarPdfTarjetaBtn(${t.id})">📄 PDF</button>
         <button class="icon-btn" onclick="enviarTarjetaCorreoBtn(${t.id})">Enviar correo</button>
+        <button class="icon-btn" onclick="enviarFormularioDatosBtn(${t.id})">📨 Enviar formulario de datos</button>
+        <button class="icon-btn" onclick="generarLinkFormularioBtn(${t.id})">🔗 Generar link (WhatsApp)</button>
         <button class="icon-btn" onclick="editarTarjeta(${t.id})">Editar</button>
         <button class="icon-btn" onclick="eliminarTarjeta(${t.id})">Rechazar</button>
       </td>
