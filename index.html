@@ -2664,7 +2664,7 @@ async function marcarRevisadaTarjeta(id){
 }
 function renderNuevasTarjetas(){
   const cont = document.getElementById('tabla-nuevas-tarjetas');
-  const lista = cacheTarjetas.filter(t => t.tokenUsado === 'si' && t.revisadoPorAdmin !== 'si');
+  const lista = cacheTarjetas.filter(t => t.tokenUsado === 'si' && t.revisadoPorAdmin !== 'si' && t.estado!=='rechazada' && t.estado!=='completada');
   if (!lista.length){ cont.innerHTML = '<p class="empty">Sin solicitudes nuevas por revisar.</p>'; return; }
   cont.innerHTML = '<table><tr><th>Torre/Depto</th><th>Nombre</th><th>Motivo</th><th>Pagado</th><th>Fecha solicitud</th><th>Estado</th><th>Checklist</th><th></th></tr>' +
     lista.map(filaTarjetaHtml).join('') + '</table>';
