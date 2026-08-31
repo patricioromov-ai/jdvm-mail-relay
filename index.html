@@ -433,7 +433,11 @@
       <div class="topline"><div><h2>Reservas</h2><p>Quincho, salones, mudanzas y otros espacios comunes</p></div></div>
 
       <div class="card">
-        <h3 id="res-form-titulo">Nueva reserva</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <h3 id="res-form-titulo" style="margin:0;">Nueva reserva</h3>
+          <button class="icon-btn" onclick="document.getElementById('res-csv-input').click()">＋ Importar CSV</button>
+        </div>
+        <input type="file" id="res-csv-input" accept=".csv" style="display:none;" onchange="importarReservasCSV(event)">
         <input type="hidden" id="res-id">
         <div class="form-grid">
           <div class="form-row"><label>Espacio</label>
@@ -1299,6 +1303,37 @@ function parseCSV(texto){
     headers.forEach((h, i) => obj[h] = valores[i] || '');
     return obj;
   });
+}
+async function importarReservasCSV(evento){
+  const file = evento.target.files[0];
+  if (!file) return;
+  const texto = await file.text();
+  const filas = parseCSV(texto);
+  const reservas = filas.map(f => ({
+    espacio: f.espacio || '',
+    fecha: f.fecha || '',
+    horaInicio: f.horaInicio || f.horainicio || '',
+    horaTermino: f.horaTermino || f.horatermino || '',
+    nombreSolicitante: f.nombreSolicitante || f.nombresolicitante || f.nombre || '',
+    unidad: f.unidad || '',
+    torre: f.torre || '',
+    notas: f.notas || ''
+  })).filter(r => r.espacio && r.fecha && r.horaInicio && r.horaTermino);
+
+  if (!reservas.length) return alert('No se encontraron filas válidas (columnas esperadas: espacio,fecha,horaInicio,horaTermino,nombreSolicitante,unidad,torre,notas).');
+  if (!confirm(`Se importarán hasta ${reservas.length} reservas. Las que choquen en horario con otra ya existente se van a omitir. ¿Continuar?`)) return;
+  try{
+    const r = await api('addReservasBulk', { reservas });
+    let msg = `✔ Agregadas: ${r.agregadas}`;
+    if (r.omitidas.length){
+      msg += `\n✘ Omitidas por choque de horario u otro motivo: ${r.omitidas.length}\n` +
+        r.omitidas.slice(0,10).map(o=>`- ${o.fecha} ${o.horaInicio}-${o.horaTermino} ${o.espacio} (${o.motivo})`).join('\n');
+      if (r.omitidas.length > 10) msg += `\n... y ${r.omitidas.length-10} más`;
+    }
+    alert(msg);
+    await cargarTodo();
+  }catch(e){}
+  evento.target.value = '';
 }
 async function importarCSV(evento){
   const file = evento.target.files[0];
