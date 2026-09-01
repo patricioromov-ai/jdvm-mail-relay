@@ -576,6 +576,11 @@
         <button class="icon-btn" onclick="imprimirMudanzas()">🖨 Imprimir rango</button>
       </div>
 
+      <div class="card" id="card-nuevas-mudanzas" style="display:none;background:#F2E8DA;border-left:4px solid #C98A2C;">
+        <h3>Nuevas solicitudes (llegaron por el link, sin revisar)</h3>
+        <div id="tabla-nuevas-mudanzas"></div>
+      </div>
+
       <div class="card">
         <h3>Mudanzas agendadas</h3>
         <div id="tabla-mudanzas"><p class="empty">Cargando...</p></div>
@@ -2449,6 +2454,56 @@ function verQrMudanzaBtn(id){
   const urlQr = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + encodeURIComponent(urlValidacion);
   window.open(urlQr, '_blank');
 }
+function renderNuevasMudanzas(){
+  const card = document.getElementById('card-nuevas-mudanzas');
+  const cont = document.getElementById('tabla-nuevas-mudanzas');
+  const lista = cacheMudanzas.filter(m => m.origenPublico==='si' && m.revisadoPorAdmin!=='si' && m.estado!=='cancelada' && m.estado!=='realizada')
+    .sort((a,b)=>(a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
+  if (!lista.length){ card.style.display='none'; return; }
+  card.style.display = 'block';
+  cont.innerHTML = '<table><tr><th>Fecha</th><th>Horario</th><th>Torre/Unidad</th><th>Tipo</th><th>Responsable</th><th></th></tr>' +
+    lista.map(m=>`<tr>
+      <td class="mono">${esc(m.fecha)}</td>
+      <td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}</td>
+      <td><span class="torre-tab ${String(m.torre).toLowerCase()}"></span>${esc(m.torre)} / ${esc(m.unidad)}</td>
+      <td>${labelTipoMudanza(m.tipo)}</td>
+      <td>${esc(m.nombreResponsable)}</td>
+      <td>
+        <button class="icon-btn" onclick="verDetalleMudanzaBtn(${m.id})">🔍 Ver detalle</button>
+        <button class="icon-btn" onclick="marcarMudanzaRevisada(${m.id})">✔ Marcar revisada</button>
+      </td>
+    </tr>`).join('') + '</table>';
+}
+async function marcarMudanzaRevisada(id){
+  await api('updateMudanza', { id, revisadoPorAdmin: 'si' });
+  await cargarTodo();
+}
+function verDetalleMudanzaBtn(id){
+  const m = cacheMudanzas.find(x=>String(x.id)===String(id));
+  if (!m) return;
+  const campos = [
+    ['Tipo', labelTipoMudanza(m.tipo)],
+    ['Torre / Unidad', (m.torre||'-') + ' / ' + (m.unidad||'-')],
+    ['Origen (si es traslado interno)', m.torreOrigen ? (m.torreOrigen + ' / ' + (m.unidadOrigen||'-')) : '—'],
+    ['Fecha', m.fecha||'-'],
+    ['Horario', (m.horaInicio||'-') + ' a ' + (m.horaTermino||'-')],
+    ['Nombre responsable', m.nombreResponsable||'-'],
+    ['Teléfono', m.telefonoResponsable||'-'],
+    ['Correo', m.correo||'-'],
+    ['Vehículo', m.vehiculoTipo||'-'],
+    ['Patente', m.vehiculoPatente||'-'],
+    ['Es arrendatario', m.esArrendatario==='si' ? 'Sí' : 'No'],
+    ['Excepción de horario', m.excepcionHorario==='si' ? 'Sí' : 'No'],
+    ['Notas', m.notas||'-'],
+    ['Comprobante de pago', m.comprobantePagoUrl || 'No adjuntado'],
+    ['Origen de la solicitud', m.origenPublico==='si' ? 'Formulario público (autoservicio)' : 'Creada por administración'],
+    ['Aprobación Admin', m.aprobacionAdmin||'-'],
+    ['Aprobación Dueño', m.aprobacionDueno||'-'],
+    ['Estado', m.estado||'-'],
+  ];
+  const texto = campos.map(([k,v])=>k+': '+v).join('\n');
+  abrirModalTexto('Detalle de la solicitud — ' + (m.nombreResponsable||''), texto);
+}
 async function marcarMudanzaRealizada(id){
   const m = cacheMudanzas.find(x=>String(x.id)===String(id));
   const msg = (m && m.tipo==='traslado_interno')
@@ -2484,6 +2539,7 @@ async function enviarMudanzaCorreoBtn(id){
   }catch(e){}
 }
 function renderMudanzas(){
+  renderNuevasMudanzas();
   const cont = document.getElementById('tabla-mudanzas');
   const lista = cacheMudanzas.filter(m=>m.estado!=='cancelada' && m.estado!=='realizada').sort((a,b)=>(a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
 
@@ -2514,6 +2570,7 @@ function renderMudanzas(){
         ${m.esArrendatario==='si' && m.aprobacionDueno!=='aprobado' ? `<button class="icon-btn" onclick="aprobarMudanza(${m.id},'aprobacionDueno','aprobado')">Aprobar dueño</button>` : ''}
         <button class="icon-btn" onclick="generarPdfMudanzaBtn(${m.id})">📄 PDF</button>
         <button class="icon-btn" onclick="verQrMudanzaBtn(${m.id})">🔲 Ver QR</button>
+        <button class="icon-btn" onclick="verDetalleMudanzaBtn(${m.id})">🔍 Ver detalle</button>
         <button class="icon-btn" onclick="enviarMudanzaCorreoBtn(${m.id})">Enviar correo</button>
         <button class="icon-btn" onclick="editarMudanza(${m.id})">Editar</button>
         <button class="icon-btn" onclick="marcarMudanzaRealizada(${m.id})">✔ Realizada</button>
