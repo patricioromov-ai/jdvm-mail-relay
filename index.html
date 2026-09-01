@@ -2486,7 +2486,13 @@ async function enviarMudanzaCorreoBtn(id){
 function renderMudanzas(){
   const cont = document.getElementById('tabla-mudanzas');
   const lista = cacheMudanzas.filter(m=>m.estado!=='cancelada' && m.estado!=='realizada').sort((a,b)=>(a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
-  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin mudanzas agendadas.</p>'; return; }
+
+  const pendientesAdmin = lista.filter(m => m.aprobacionAdmin === 'pendiente').length;
+  const avisoPendientes = pendientesAdmin > 0
+    ? `<div class="card" style="background:#F2E8DA;border-left:4px solid #C98A2C;margin-bottom:14px;">⚠ <b>${pendientesAdmin} mudanza(s) pendiente(s) de aprobación de Administración.</b> Búscalas abajo (badge "⚠ pendiente" en el horario) y usa el botón "Aprobar admin".</div>`
+    : '';
+
+  if (!lista.length){ cont.innerHTML = avisoPendientes + '<p class="empty">Sin mudanzas agendadas.</p>'; return; }
 
   const grupos = {};
   lista.forEach(m=>{ (grupos[m.fecha] = grupos[m.fecha] || []).push(m); });
@@ -2496,9 +2502,9 @@ function renderMudanzas(){
     return `<span class="badge ${clase}">${esc(v)}</span>`;
   };
 
-  cont.innerHTML = Object.keys(grupos).sort().map(fecha=>{
+  cont.innerHTML = avisoPendientes + Object.keys(grupos).sort().map(fecha=>{
     const filas = grupos[fecha].map(m=>`<tr>
-      <td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}${m.excepcionHorario==='si' ? '<br><span class="badge borrador" title="Fuera del horario habitual">⚠ Excepción</span>' : ''}</td>
+      <td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}${m.excepcionHorario==='si' ? '<br><span class="badge borrador" title="Fuera del horario habitual">⚠ Excepción</span>' : ''}${m.aprobacionAdmin==='pendiente' ? '<br><span class="badge programada">⚠ pendiente</span>' : ''}</td>
       <td><span class="torre-tab ${String(m.torre).toLowerCase()}"></span>${esc(m.torre)} / ${esc(m.unidad)}</td>
       <td>${labelTipoMudanza(m.tipo)}</td>
       <td>${esc(m.nombreResponsable)}${m.correo ? '<br><span class="mono" style="color:var(--pending);">'+esc(m.correo)+'</span>' : ''}${m.vehiculoPatente ? '<br><span class="mono" style="color:var(--pending);">'+esc(m.vehiculoPatente)+'</span>' : ''}${m.comprobantePagoUrl ? '<br><a href="'+esc(m.comprobantePagoUrl)+'" target="_blank">📎 Comprobante</a>' : ''}</td>
