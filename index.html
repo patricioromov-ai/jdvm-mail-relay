@@ -507,10 +507,19 @@
       </div>
 
       <div class="card">
-        <h3>Formulario público de autoservicio</h3>
-        <p class="empty" style="margin-bottom:10px;">Link permanente (no de un solo uso) para que cualquier residente agende su propia mudanza, viendo los horarios disponibles y adjuntando el comprobante de pago. Queda con estado "pendiente" hasta que la apruebes.</p>
-        <button class="icon-btn" onclick="verLinkFormularioMudanza()">🔗 Ver/copiar link</button>
-        <div id="link-mudanza-publico" style="margin-top:10px;"></div>
+        <h3>Links de autoservicio para agendar mudanza</h3>
+        <p class="empty" style="margin-bottom:10px;">Cada link es de <b>un solo uso</b> por defecto — genera uno por persona y envíaselo. Para corredoras u otras personas que agendan varias unidades seguido, genera un link <b>reutilizable</b> aparte.</p>
+        <div class="form-grid">
+          <div class="form-row"><label>Nombre (para identificarlo en la lista, opcional)</label><input type="text" id="mud-enlace-nombre" placeholder="Ej. Century 21, o el nombre del residente"></div>
+        </div>
+        <button class="btn-primary" onclick="generarLinkMudanzaBtn(false)">🔗 Generar link de un solo uso</button>
+        <button class="icon-btn" onclick="generarLinkMudanzaBtn(true)">🔁 Generar link reutilizable (corredoras)</button>
+        <div id="link-mudanza-generado" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="card">
+        <h3>Enlaces generados</h3>
+        <div id="tabla-enlaces-mudanza"><p class="empty">Cargando...</p></div>
       </div>
 
       <div class="card">
@@ -858,7 +867,7 @@ const CONFIG = {
   API_SECRET: 'comunicacion_jdvm'
 };
 
-let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [], cacheTarjetas = [], cachePersonalEquipos = [], cacheMensajes = [], cacheRespuestasTipo = [], cacheHistorialCambios = [], cacheAnomaliasAceptadas = [], cacheFormularios = [], camposExtraTemp = [];
+let cacheContactos = [], cacheExternos = [], cachePlantillas = [], cacheCampanas = [], cacheLogs = [], cacheConfig = {}, cacheEncuestas = [], cacheReservas = [], cacheMudanzas = [], cacheTarjetas = [], cachePersonalEquipos = [], cacheMensajes = [], cacheRespuestasTipo = [], cacheHistorialCambios = [], cacheAnomaliasAceptadas = [], cacheFormularios = [], camposExtraTemp = [], cacheEnlacesMudanza = [];
 let campanaTipoSeleccionado = 'comunicado';
 
 if (CONFIG.API_SECRET === 'PON_AQUI_TU_API_SECRET') {
@@ -944,11 +953,11 @@ function toggleForm(id){
 // ========= CARGA INICIAL =========
 async function cargarTodo(){
   try{
-    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas, cacheMudanzas, cacheTarjetas, cachePersonalEquipos, cacheMensajes, cacheRespuestasTipo, cacheHistorialCambios, cacheAnomaliasAceptadas, cacheFormularios] = await Promise.all([
-      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas'), api('listMudanzas'), api('listTarjetas'), api('listPersonalEquipos'), api('listMensajes'), api('listRespuestasTipo'), api('listHistorialCambiosContactos'), api('listAnomaliasAceptadas'), api('listFormularios')
+    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheReservas, cacheMudanzas, cacheTarjetas, cachePersonalEquipos, cacheMensajes, cacheRespuestasTipo, cacheHistorialCambios, cacheAnomaliasAceptadas, cacheFormularios, cacheEnlacesMudanza] = await Promise.all([
+      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listReservas'), api('listMudanzas'), api('listTarjetas'), api('listPersonalEquipos'), api('listMensajes'), api('listRespuestasTipo'), api('listHistorialCambiosContactos'), api('listAnomaliasAceptadas'), api('listFormularios'), api('listEnlacesMudanza')
     ]);
     renderPanel(); renderContactos(); renderExternos(); renderPlantillas();
-    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas(); renderMudanzas(); renderTarjetas(); renderPersonalEquipos(); renderMensajes(); renderRespuestasTipo(); renderAnomalias(); renderFormularios(); renderCamposExtraLista();
+    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderReservas(); renderMudanzas(); renderTarjetas(); renderPersonalEquipos(); renderMensajes(); renderRespuestasTipo(); renderAnomalias(); renderFormularios(); renderCamposExtraLista(); renderEnlacesMudanza();
   }catch(e){ /* el error ya se muestra en el banner */ }
 }
 cargarTodo();
@@ -2279,13 +2288,41 @@ function buscarContactosOrigen(){
   sel.innerHTML = '<option value="">Selecciona quién se traslada</option>' +
     candidatos.map(c=>`<option value="${c.id}">${esc(c.nombre)} (${esc(c.tipo)})</option>`).join('');
 }
-async function verLinkFormularioMudanza(){
-  const cont = document.getElementById('link-mudanza-publico');
+async function generarLinkMudanzaBtn(reutilizable){
+  const nombre = document.getElementById('mud-enlace-nombre').value;
+  const cont = document.getElementById('link-mudanza-generado');
   cont.innerHTML = '<p class="empty">Generando...</p>';
   try{
-    const r = await api('obtenerLinkFormularioMudanza');
-    cont.innerHTML = `<a href="${esc(r.url)}" target="_blank" class="mono">${esc(r.url)}</a> <button class="icon-btn" onclick="navigator.clipboard.writeText('${esc(r.url)}')">Copiar</button>`;
+    const r = await api('generarLinkMudanza', { nombre, reutilizable });
+    navigator.clipboard.writeText(r.url).then(()=>{}).catch(()=>{});
+    cont.innerHTML = `<a href="${esc(r.url)}" target="_blank" class="mono">${esc(r.url)}</a> <button class="icon-btn" onclick="navigator.clipboard.writeText('${esc(r.url)}')">Copiar</button>
+      <p class="empty" style="margin-top:6px;">${reutilizable ? '🔁 Reutilizable — se puede usar varias veces.' : '🔗 Un solo uso — deja de funcionar apenas se complete una mudanza con él.'}</p>`;
+    document.getElementById('mud-enlace-nombre').value = '';
+    await cargarTodo();
   }catch(e){ cont.innerHTML = '<p class="empty">No se pudo generar el link.</p>'; }
+}
+function renderEnlacesMudanza(){
+  const cont = document.getElementById('tabla-enlaces-mudanza');
+  if (!cacheEnlacesMudanza || !cacheEnlacesMudanza.length){ cont.innerHTML = '<p class="empty">Sin enlaces generados aún.</p>'; return; }
+  const lista = [...cacheEnlacesMudanza].sort((a,b)=>String(b.fechaCreacion).localeCompare(String(a.fechaCreacion)));
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Usos</th><th>Link</th><th></th></tr>' +
+    lista.map(e=>{
+      const link = e.linkCorto || '';
+      const bloqueado = e.reutilizable!=='si' && e.usado==='si';
+      return `<tr>
+        <td>${esc(e.nombre)||'—'}</td>
+        <td>${e.reutilizable==='si' ? '🔁 Reutilizable' : '🔗 Un solo uso'}</td>
+        <td><span class="badge ${bloqueado?'borrador':'enviada'}">${bloqueado?'usado':'activo'}</span></td>
+        <td class="mono">${esc(e.usosContados)||0}</td>
+        <td class="mono">${link ? `<a href="${esc(link)}" target="_blank">${esc(link)}</a>` : '—'}</td>
+        <td>${!bloqueado ? `<button class="icon-btn" onclick="invalidarEnlaceMudanzaBtn(${e.id})">Invalidar</button>` : ''}</td>
+      </tr>`;
+    }).join('') + '</table>';
+}
+async function invalidarEnlaceMudanzaBtn(id){
+  if (!confirm('¿Invalidar este link? Dejará de funcionar de inmediato.')) return;
+  await api('invalidarEnlaceMudanza', { id });
+  await cargarTodo();
 }
 function calcularHoraTermino(){
   const inicio = document.getElementById('mud-hora-inicio').value;
@@ -2405,6 +2442,13 @@ function renderHistorialMudanzas(){
     <td>${labelTipoMudanza(m.tipo)}</td><td>${esc(m.nombreResponsable)}</td>
     <td><span class="badge ${m.estado==='realizada'?'enviada':'borrador'}">${esc(m.estado)}</span></td></tr>`).join('') + '</table>';
 }
+function verQrMudanzaBtn(id){
+  const m = cacheMudanzas.find(x=>String(x.id)===String(id));
+  if (!m || !m.tokenValidacion) return alert('Esta mudanza todavía no tiene un código QR generado.');
+  const urlValidacion = CONFIG.APPS_SCRIPT_URL + '?action=validarMudanza&token=' + m.tokenValidacion;
+  const urlQr = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + encodeURIComponent(urlValidacion);
+  window.open(urlQr, '_blank');
+}
 async function marcarMudanzaRealizada(id){
   const m = cacheMudanzas.find(x=>String(x.id)===String(id));
   const msg = (m && m.tipo==='traslado_interno')
@@ -2457,12 +2501,13 @@ function renderMudanzas(){
       <td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}${m.excepcionHorario==='si' ? '<br><span class="badge borrador" title="Fuera del horario habitual">⚠ Excepción</span>' : ''}</td>
       <td><span class="torre-tab ${String(m.torre).toLowerCase()}"></span>${esc(m.torre)} / ${esc(m.unidad)}</td>
       <td>${labelTipoMudanza(m.tipo)}</td>
-      <td>${esc(m.nombreResponsable)}${m.vehiculoPatente ? '<br><span class="mono" style="color:var(--pending);">'+esc(m.vehiculoPatente)+'</span>' : ''}${m.comprobantePagoUrl ? '<br><a href="'+esc(m.comprobantePagoUrl)+'" target="_blank">📎 Comprobante</a>' : ''}</td>
+      <td>${esc(m.nombreResponsable)}${m.correo ? '<br><span class="mono" style="color:var(--pending);">'+esc(m.correo)+'</span>' : ''}${m.vehiculoPatente ? '<br><span class="mono" style="color:var(--pending);">'+esc(m.vehiculoPatente)+'</span>' : ''}${m.comprobantePagoUrl ? '<br><a href="'+esc(m.comprobantePagoUrl)+'" target="_blank">📎 Comprobante</a>' : ''}</td>
       <td>Admin: ${chip(m.aprobacionAdmin)}<br>Dueño: ${chip(m.aprobacionDueno)}</td>
       <td>
         ${m.aprobacionAdmin!=='aprobado' ? `<button class="icon-btn" onclick="aprobarMudanza(${m.id},'aprobacionAdmin','aprobado')">Aprobar admin</button>` : ''}
         ${m.esArrendatario==='si' && m.aprobacionDueno!=='aprobado' ? `<button class="icon-btn" onclick="aprobarMudanza(${m.id},'aprobacionDueno','aprobado')">Aprobar dueño</button>` : ''}
         <button class="icon-btn" onclick="generarPdfMudanzaBtn(${m.id})">📄 PDF</button>
+        <button class="icon-btn" onclick="verQrMudanzaBtn(${m.id})">🔲 Ver QR</button>
         <button class="icon-btn" onclick="enviarMudanzaCorreoBtn(${m.id})">Enviar correo</button>
         <button class="icon-btn" onclick="editarMudanza(${m.id})">Editar</button>
         <button class="icon-btn" onclick="marcarMudanzaRealizada(${m.id})">✔ Realizada</button>
