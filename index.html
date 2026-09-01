@@ -576,6 +576,11 @@
         <button class="icon-btn" onclick="imprimirMudanzas()">🖨 Imprimir rango</button>
       </div>
 
+      <div class="card" id="card-pendientes-mudanzas" style="display:none;background:#F7E4E4;border-left:4px solid #C1544B;">
+        <h3>⚠ Pendientes de aprobación</h3>
+        <div id="tabla-pendientes-mudanzas"></div>
+      </div>
+
       <div class="card" id="card-nuevas-mudanzas" style="display:none;background:#F2E8DA;border-left:4px solid #C98A2C;">
         <h3>Nuevas solicitudes (llegaron por el link, sin revisar)</h3>
         <div id="tabla-nuevas-mudanzas"></div>
@@ -2454,6 +2459,35 @@ function verQrMudanzaBtn(id){
   const urlQr = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + encodeURIComponent(urlValidacion);
   window.open(urlQr, '_blank');
 }
+function renderPendientesMudanzas(){
+  const card = document.getElementById('card-pendientes-mudanzas');
+  const cont = document.getElementById('tabla-pendientes-mudanzas');
+  const lista = cacheMudanzas.filter(m =>
+    m.estado!=='cancelada' && m.estado!=='realizada' &&
+    (m.aprobacionAdmin==='pendiente' || (m.esArrendatario==='si' && m.aprobacionDueno==='pendiente'))
+  ).sort((a,b)=>(a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
+  if (!lista.length){ card.style.display='none'; return; }
+  card.style.display = 'block';
+  cont.innerHTML = '<table><tr><th>Fecha</th><th>Horario</th><th>Torre/Unidad</th><th>Tipo</th><th>Responsable</th><th>Falta aprobar</th><th></th></tr>' +
+    lista.map(m=>{
+      const falta = [];
+      if (m.aprobacionAdmin==='pendiente') falta.push('Admin');
+      if (m.esArrendatario==='si' && m.aprobacionDueno==='pendiente') falta.push('Dueño');
+      return `<tr>
+        <td class="mono">${esc(m.fecha)}</td>
+        <td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}</td>
+        <td><span class="torre-tab ${String(m.torre).toLowerCase()}"></span>${esc(m.torre)} / ${esc(m.unidad)}</td>
+        <td>${labelTipoMudanza(m.tipo)}</td>
+        <td>${esc(m.nombreResponsable)}</td>
+        <td>${falta.join(', ')}</td>
+        <td>
+          ${m.aprobacionAdmin==='pendiente' ? `<button class="icon-btn" onclick="aprobarMudanza(${m.id},'aprobacionAdmin','aprobado')">Aprobar admin</button>` : ''}
+          ${m.esArrendatario==='si' && m.aprobacionDueno==='pendiente' ? `<button class="icon-btn" onclick="aprobarMudanza(${m.id},'aprobacionDueno','aprobado')">Aprobar dueño</button>` : ''}
+          <button class="icon-btn" onclick="verDetalleMudanzaBtn(${m.id})">🔍 Ver detalle</button>
+        </td>
+      </tr>`;
+    }).join('') + '</table>';
+}
 function renderNuevasMudanzas(){
   const card = document.getElementById('card-nuevas-mudanzas');
   const cont = document.getElementById('tabla-nuevas-mudanzas');
@@ -2540,15 +2574,11 @@ async function enviarMudanzaCorreoBtn(id){
 }
 function renderMudanzas(){
   renderNuevasMudanzas();
+  renderPendientesMudanzas();
   const cont = document.getElementById('tabla-mudanzas');
   const lista = cacheMudanzas.filter(m=>m.estado!=='cancelada' && m.estado!=='realizada').sort((a,b)=>(a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
 
-  const pendientesAdmin = lista.filter(m => m.aprobacionAdmin === 'pendiente').length;
-  const avisoPendientes = pendientesAdmin > 0
-    ? `<div class="card" style="background:#F2E8DA;border-left:4px solid #C98A2C;margin-bottom:14px;">⚠ <b>${pendientesAdmin} mudanza(s) pendiente(s) de aprobación de Administración.</b> Búscalas abajo (badge "⚠ pendiente" en el horario) y usa el botón "Aprobar admin".</div>`
-    : '';
-
-  if (!lista.length){ cont.innerHTML = avisoPendientes + '<p class="empty">Sin mudanzas agendadas.</p>'; return; }
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin mudanzas agendadas.</p>'; return; }
 
   const grupos = {};
   lista.forEach(m=>{ (grupos[m.fecha] = grupos[m.fecha] || []).push(m); });
@@ -2558,7 +2588,7 @@ function renderMudanzas(){
     return `<span class="badge ${clase}">${esc(v)}</span>`;
   };
 
-  cont.innerHTML = avisoPendientes + Object.keys(grupos).sort().map(fecha=>{
+  cont.innerHTML = Object.keys(grupos).sort().map(fecha=>{
     const filas = grupos[fecha].map(m=>`<tr>
       <td class="mono">${esc(m.horaInicio)}–${esc(m.horaTermino)}${m.excepcionHorario==='si' ? '<br><span class="badge borrador" title="Fuera del horario habitual">⚠ Excepción</span>' : ''}${m.aprobacionAdmin==='pendiente' ? '<br><span class="badge programada">⚠ pendiente</span>' : ''}</td>
       <td><span class="torre-tab ${String(m.torre).toLowerCase()}"></span>${esc(m.torre)} / ${esc(m.unidad)}</td>
