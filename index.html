@@ -2802,6 +2802,36 @@ async function marcarPagadoTarjeta(id){
   await api('updateTarjeta', { id, pagado: 'SI', estado: 'solicitada' });
   await cargarTodo();
 }
+function verDetalleTarjetaBtn(id){
+  const t = cacheTarjetas.find(x=>String(x.id)===String(id));
+  if (!t) return;
+  const campos = [
+    ['Torre / Depto', (t.torre||'-') + ' / ' + (t.depto||'-')],
+    ['Nombre', t.nombre||'-'],
+    ['Cantidad', t.cantidad||'-'],
+    ['Motivo', t.motivo||'-'],
+    ['Pagado', t.pagado||'-'],
+    ['N° Serie', t.numeroSerie||'-'],
+    ['Fecha de solicitud', t.fechaSolicitud||'-'],
+    ['RUT', t.rut||'-'],
+    ['Correo', t.correo||'-'],
+    ['Teléfono contacto', t.telefonoContacto||'-'],
+    ['Nombre propietario', t.nombrePropietario||'-'],
+    ['Fecha de ingreso', t.fechaIngreso||'-'],
+    ['Vehículo', t.vehiculo==='si' ? ('Sí — '+(t.patenteVehiculo||'sin patente')) : 'No'],
+    ['Estacionamiento', t.numeroEstacionamiento||'-'],
+    ['Bodega', t.numeroBodega||'-'],
+    ['Mascotas', t.mascotas==='si' ? 'Sí' : 'No'],
+    ['Comentario', t.comentario||'-'],
+    ['Información extra', t.informacionExtra||'-'],
+    ['Comprobante de pago', t.comprobantePagoUrl || 'No adjuntado'],
+    ['Entregada por', t.entregadoPor ? (t.entregadoPor + (t.entregadoFecha ? ' — '+t.entregadoFecha : '')) : 'Sin entregar'],
+    ['Recepcionada por', t.recepcionadoPor ? (t.recepcionadoPor + (t.recepcionadoFecha ? ' — '+t.recepcionadoFecha : '')) : 'Sin recepción'],
+    ['Estado', t.estado||'-'],
+  ];
+  const texto = campos.map(([k,v])=>k+': '+v).join('\n');
+  abrirModalTexto('Detalle de la solicitud — ' + (t.nombre||''), texto);
+}
 function badgeEstadoTarjeta(estado){
   const mapa = { pendiente_pago:'err', solicitada:'programada', en_proceso:'borrador', lista_entrega:'enviando', completada:'enviada', rechazada:'err' };
   return `<span class="badge ${mapa[estado]||'borrador'}">${esc(estado)}</span>`;
@@ -2823,6 +2853,7 @@ function filaTarjetaHtml(t){
         ${!t.entregadoPor ? `<button class="icon-btn" onclick="confirmarEntregaTarjeta(${t.id})">Confirmar entrega</button>` : ''}
         ${!t.recepcionadoPor ? `<button class="icon-btn" onclick="confirmarRecepcionTarjeta(${t.id})">Confirmar recepción</button>` : ''}
         <button class="icon-btn" onclick="generarPdfTarjetaBtn(${t.id})">📄 PDF</button>
+        <button class="icon-btn" onclick="verDetalleTarjetaBtn(${t.id})">🔍 Ver detalle</button>
         <button class="icon-btn" onclick="enviarTarjetaCorreoBtn(${t.id})">Enviar correo</button>
         ${!t.tokenUsado || t.tokenUsado!=='si' ? `<button class="icon-btn" onclick="enviarFormularioDatosBtn(${t.id})">📨 Enviar formulario de datos</button>
         <button class="icon-btn" onclick="generarLinkFormularioBtn(${t.id})">🔗 Generar link (WhatsApp)</button>` : ''}
