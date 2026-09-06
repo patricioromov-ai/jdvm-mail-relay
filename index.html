@@ -675,6 +675,11 @@
           <button class="icon-btn" onclick="enviarConsolidadoCorreoBtn()">📧 Enviar por correo</button>
         </div>
 
+        <div class="card" id="card-links-pendientes-tarjeta" style="display:none;background:#EAEAE4;border-left:4px solid #8A8A80;">
+          <h3>🔗 Links enviados — esperando que el residente complete</h3>
+          <div id="tabla-links-pendientes-tarjeta"></div>
+        </div>
+
         <div class="card">
           <h3>Solicitudes activas</h3>
           <div id="tabla-tarjetas"><p class="empty">Cargando...</p></div>
@@ -2873,15 +2878,38 @@ function renderNuevasTarjetas(){
   cont.innerHTML = '<table><tr><th>Torre/Depto</th><th>Nombre</th><th>Motivo</th><th>Pagado</th><th>Fecha solicitud</th><th>Estado</th><th>Checklist</th><th></th></tr>' +
     lista.map(filaTarjetaHtml).join('') + '</table>';
 }
+const NOMBRE_PLACEHOLDER_TARJETA = '(pendiente de completar por el residente)';
+function esLinkPendienteSinCompletar(t){
+  return t.nombre === NOMBRE_PLACEHOLDER_TARJETA && t.tokenUsado !== 'si';
+}
+function renderLinksPendientesTarjeta(){
+  const card = document.getElementById('card-links-pendientes-tarjeta');
+  const cont = document.getElementById('tabla-links-pendientes-tarjeta');
+  const lista = cacheTarjetas.filter(t => esLinkPendienteSinCompletar(t) && t.estado!=='rechazada')
+    .sort((a,b)=>String(b.fechaSolicitud).localeCompare(String(a.fechaSolicitud)));
+  if (!lista.length){ card.style.display='none'; return; }
+  card.style.display = 'block';
+  cont.innerHTML = '<table><tr><th>Link generado el</th><th>Estado del link</th><th></th></tr>' +
+    lista.map(t=>`<tr>
+      <td class="mono">${esc(t.fechaSolicitud)}</td>
+      <td><span class="badge borrador">esperando respuesta</span></td>
+      <td>
+        <button class="icon-btn" onclick="enviarFormularioDatosBtn(${t.id})">📨 Reenviar por correo</button>
+        <button class="icon-btn" onclick="generarLinkFormularioBtn(${t.id})">🔗 Copiar link (WhatsApp)</button>
+        <button class="icon-btn" onclick="eliminarTarjeta(${t.id})">Cancelar</button>
+      </td>
+    </tr>`).join('') + '</table>';
+}
 function renderTarjetas(){
   const cont = document.getElementById('tabla-tarjetas');
   const filtroTorre = document.getElementById('tar-filtro-torre')?.value || '';
   const filtroEstado = document.getElementById('tar-filtro-estado')?.value || '';
-  let lista = cacheTarjetas.filter(t => t.estado!=='completada' && t.estado!=='rechazada' && !(t.tokenUsado==='si' && t.revisadoPorAdmin!=='si'));
+  let lista = cacheTarjetas.filter(t => t.estado!=='completada' && t.estado!=='rechazada' && !(t.tokenUsado==='si' && t.revisadoPorAdmin!=='si') && !esLinkPendienteSinCompletar(t));
   if (filtroTorre) lista = lista.filter(t=>t.torre===filtroTorre);
   if (filtroEstado) lista = lista.filter(t=>t.estado===filtroEstado);
 
   renderNuevasTarjetas();
+  renderLinksPendientesTarjeta();
 
   if (!lista.length){ cont.innerHTML = '<p class="empty">Sin solicitudes activas.</p>'; return; }
 
