@@ -675,6 +675,11 @@
           <button class="icon-btn" onclick="enviarConsolidadoCorreoBtn()">📧 Enviar por correo</button>
         </div>
 
+        <div class="card" id="card-confeccion-tarjeta" style="display:none;background:#F2E8DA;border-left:4px solid #C98A2C;">
+          <h3>🎫 Tarjetas en confección (con volante, sin entregar aún)</h3>
+          <div id="tabla-confeccion-tarjeta"></div>
+        </div>
+
         <div class="card" id="card-links-pendientes-tarjeta" style="display:none;background:#EAEAE4;border-left:4px solid #8A8A80;">
           <h3>🔗 Links enviados — esperando que el residente complete</h3>
           <div id="tabla-links-pendientes-tarjeta"></div>
@@ -2844,6 +2849,11 @@ function badgeEstadoTarjeta(estado){
 function filaTarjetaHtml(t){
   const noPagado = String(t.pagado||'').toUpperCase() !== 'SI';
   const esNueva = t.tokenUsado === 'si' && t.revisadoPorAdmin !== 'si';
+  const infoConfeccion = t.estado==='en_proceso'
+    ? `<br><span class="mono" style="color:var(--pending);">📤 En confección (${esc(t.enviadoConfeccionPor)||'sin nombre'}) desde ${esc(t.fechaEnvioConfeccion)}</span>`
+    : t.estado==='lista_entrega'
+    ? `<br><span class="mono" style="color:var(--pending);">✔ Lista para entrega desde ${esc(t.fechaListaEntrega)}</span>`
+    : '';
   return `<tr>
       <td>${t.torre ? '<span class="torre-tab '+String(t.torre).toLowerCase()+'"></span>'+esc(t.torre)+' / ' : ''}${esc(t.depto)||'—'}</td>
       <td>${esc(t.nombre)}${t.tipo==='personal' ? ' <span class="mono" style="color:var(--pending);">(personal)</span>' : ''}${t.correo ? '<br><span class="mono" style="color:var(--pending);">'+esc(t.correo)+'</span>' : ''}${t.comprobantePagoUrl ? '<br><a href="'+esc(t.comprobantePagoUrl)+'" target="_blank">📎 Comprobante</a>' : ''}</td>
@@ -2851,10 +2861,12 @@ function filaTarjetaHtml(t){
       <td>${esc(t.pagado)}</td>
       <td class="mono">${esc(t.fechaSolicitud)||'—'}</td>
       <td>${badgeEstadoTarjeta(t.estado)}</td>
-      <td>${t.entregadoPor ? '✔ Entregada ('+esc(t.entregadoPor)+')' : '☐ Sin entregar'}<br>${t.recepcionadoPor ? '✔ Recibida ('+esc(t.recepcionadoPor)+')' : '☐ Sin recepción'}</td>
+      <td>${t.entregadoPor ? '✔ Entregada ('+esc(t.entregadoPor)+')' : '☐ Sin entregar'}<br>${t.recepcionadoPor ? '✔ Recibida ('+esc(t.recepcionadoPor)+')' : '☐ Sin recepción'}${infoConfeccion}</td>
       <td>
         ${esNueva ? `<button class="icon-btn" onclick="marcarRevisadaTarjeta(${t.id})">✔ Marcar revisada</button>` : ''}
         ${noPagado ? `<button class="icon-btn" onclick="marcarPagadoTarjeta(${t.id})">💰 Marcar pagado</button>` : ''}
+        ${t.estado==='solicitada' ? `<button class="icon-btn" onclick="enviarAConfeccionBtn(${t.id})">📤 Enviar a confección</button>` : ''}
+        ${t.estado==='en_proceso' ? `<button class="icon-btn" onclick="marcarListaEntregaBtn(${t.id})">✔ Volvió — lista para entrega</button>` : ''}
         ${!t.entregadoPor ? `<button class="icon-btn" onclick="confirmarEntregaTarjeta(${t.id})">Confirmar entrega</button>` : ''}
         ${!t.recepcionadoPor ? `<button class="icon-btn" onclick="confirmarRecepcionTarjeta(${t.id})">Confirmar recepción</button>` : ''}
         <button class="icon-btn" onclick="generarPdfTarjetaBtn(${t.id})">📄 PDF</button>
@@ -2882,6 +2894,36 @@ const NOMBRE_PLACEHOLDER_TARJETA = '(pendiente de completar por el residente)';
 function esLinkPendienteSinCompletar(t){
   return t.nombre === NOMBRE_PLACEHOLDER_TARJETA && t.tokenUsado !== 'si';
 }
+async function enviarAConfeccionBtn(id){
+  const volante = prompt('¿Quién se lleva la tarjeta a confeccionar? (nombre del volante/encargado)');
+  if (volante === null) return;
+  await api('enviarTarjetaAConfeccion', { id, volante });
+  await cargarTodo();
+}
+async function marcarListaEntregaBtn(id){
+  if (!confirm('¿La tarjeta ya volvió de confección y está lista para entregar al residente?')) return;
+  await api('marcarTarjetaListaEntrega', { id });
+  await cargarTodo();
+}
+function renderConfeccionTarjeta(){
+  const card = document.getElementById('card-confeccion-tarjeta');
+  const cont = document.getElementById('tabla-confeccion-tarjeta');
+  const lista = cacheTarjetas.filter(t => t.estado === 'en_proceso')
+    .sort((a,b)=>String(a.fechaEnvioConfeccion).localeCompare(String(b.fechaEnvioConfeccion)));
+  if (!lista.length){ card.style.display='none'; return; }
+  card.style.display = 'block';
+  cont.innerHTML = '<table><tr><th>Torre/Depto</th><th>Nombre</th><th>Enviada a</th><th>Desde</th><th></th></tr>' +
+    lista.map(t=>`<tr>
+      <td>${t.torre ? '<span class="torre-tab '+String(t.torre).toLowerCase()+'"></span>'+esc(t.torre)+' / ' : ''}${esc(t.depto)||'—'}</td>
+      <td>${esc(t.nombre)}</td>
+      <td>${esc(t.enviadoConfeccionPor)||'—'}</td>
+      <td class="mono">${esc(t.fechaEnvioConfeccion)||'—'}</td>
+      <td>
+        <button class="icon-btn" onclick="marcarListaEntregaBtn(${t.id})">✔ Volvió — lista para entrega</button>
+        <button class="icon-btn" onclick="verDetalleTarjetaBtn(${t.id})">🔍 Ver detalle</button>
+      </td>
+    </tr>`).join('') + '</table>';
+}
 function renderLinksPendientesTarjeta(){
   const card = document.getElementById('card-links-pendientes-tarjeta');
   const cont = document.getElementById('tabla-links-pendientes-tarjeta');
@@ -2904,12 +2946,13 @@ function renderTarjetas(){
   const cont = document.getElementById('tabla-tarjetas');
   const filtroTorre = document.getElementById('tar-filtro-torre')?.value || '';
   const filtroEstado = document.getElementById('tar-filtro-estado')?.value || '';
-  let lista = cacheTarjetas.filter(t => t.estado!=='completada' && t.estado!=='rechazada' && !(t.tokenUsado==='si' && t.revisadoPorAdmin!=='si') && !esLinkPendienteSinCompletar(t));
+  let lista = cacheTarjetas.filter(t => t.estado!=='completada' && t.estado!=='rechazada' && t.estado!=='en_proceso' && !(t.tokenUsado==='si' && t.revisadoPorAdmin!=='si') && !esLinkPendienteSinCompletar(t));
   if (filtroTorre) lista = lista.filter(t=>t.torre===filtroTorre);
   if (filtroEstado) lista = lista.filter(t=>t.estado===filtroEstado);
 
   renderNuevasTarjetas();
   renderLinksPendientesTarjeta();
+  renderConfeccionTarjeta();
 
   if (!lista.length){ cont.innerHTML = '<p class="empty">Sin solicitudes activas.</p>'; return; }
 
