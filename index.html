@@ -2693,10 +2693,13 @@ function toggleFormularioManualTarjeta(){
 }
 async function generarLinkSolicitudRapida(){
   try{
-    const nueva = await api('crearSolicitudRapida');
+    const referencia = prompt('¿A nombre de quién es esta solicitud? (para poder identificarla después — ej. "Familia Pérez, depto 501" o el nombre que tengas)');
+    if (referencia === null) return;
+    const nueva = await api('crearSolicitudRapida', { referencia });
     const destinatario = prompt('¿A qué correo enviar el link? (déjalo vacío y presiona Aceptar para solo copiarlo, ej. para WhatsApp)');
     if (destinatario){
       const r = await api('enviarFormularioTarjetaPorCorreo', { id: nueva.id, destinatario });
+      await api('updateTarjeta', { id: nueva.id, correo: destinatario });
       if (r.enviado) alert('✔ Link enviado a ' + destinatario);
       else alert('✘ No se pudo enviar el correo. Link generado igual:\n' + r.url);
     } else {
@@ -2773,8 +2776,10 @@ async function enviarFormularioDatosBtn(id){
   if (!destinatario) return;
   try{
     const r = await api('enviarFormularioTarjetaPorCorreo', { id, destinatario });
+    await api('updateTarjeta', { id, correo: destinatario });
     if (r.enviado) alert('✔ Formulario enviado a ' + destinatario);
     else alert('✘ No se pudo enviar el correo. Link generado igual:\n' + r.url);
+    await cargarTodo();
   }catch(e){}
 }
 async function generarLinkFormularioBtn(id){
@@ -2920,6 +2925,8 @@ function renderConfeccionTarjeta(){
       <td class="mono">${esc(t.fechaEnvioConfeccion)||'—'}</td>
       <td>
         <button class="icon-btn" onclick="marcarListaEntregaBtn(${t.id})">✔ Volvió — lista para entrega</button>
+        <button class="icon-btn" onclick="generarPdfTarjetaBtn(${t.id})">📄 PDF (para el volante)</button>
+        <button class="icon-btn" onclick="enviarTarjetaCorreoBtn(${t.id})">Enviar correo</button>
         <button class="icon-btn" onclick="verDetalleTarjetaBtn(${t.id})">🔍 Ver detalle</button>
       </td>
     </tr>`).join('') + '</table>';
@@ -2931,9 +2938,11 @@ function renderLinksPendientesTarjeta(){
     .sort((a,b)=>String(b.fechaSolicitud).localeCompare(String(a.fechaSolicitud)));
   if (!lista.length){ card.style.display='none'; return; }
   card.style.display = 'block';
-  cont.innerHTML = '<table><tr><th>Link generado el</th><th>Estado del link</th><th></th></tr>' +
+  cont.innerHTML = '<table><tr><th>Link generado el</th><th>Para</th><th>Estado del link</th><th></th></tr>' +
     lista.map(t=>`<tr>
       <td class="mono">${esc(t.fechaSolicitud)}</td>
+      <td>${esc(t.comentario)||'<span class="empty">sin referencia</span>'}${t.correo ? '<br><span class="mono" style="color:var(--pending);">'+esc(t.correo)+'</span>' : ''}
+        <br><button class="icon-btn" style="padding:2px 8px;font-size:0.75rem;" onclick="editarReferenciaLinkTarjeta(${t.id})">✎ Editar</button></td>
       <td><span class="badge borrador">esperando respuesta</span></td>
       <td>
         <button class="icon-btn" onclick="enviarFormularioDatosBtn(${t.id})">📨 Reenviar por correo</button>
@@ -2941,6 +2950,13 @@ function renderLinksPendientesTarjeta(){
         <button class="icon-btn" onclick="eliminarTarjeta(${t.id})">Cancelar</button>
       </td>
     </tr>`).join('') + '</table>';
+}
+async function editarReferenciaLinkTarjeta(id){
+  const t = cacheTarjetas.find(x=>String(x.id)===String(id));
+  const nuevaReferencia = prompt('¿A nombre de quién es esta solicitud?', t ? t.comentario : '');
+  if (nuevaReferencia === null) return;
+  await api('updateTarjeta', { id, comentario: nuevaReferencia });
+  await cargarTodo();
 }
 function renderTarjetas(){
   const cont = document.getElementById('tabla-tarjetas');
