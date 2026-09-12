@@ -2325,19 +2325,43 @@ function renderEnlacesMudanza(){
   const cont = document.getElementById('tabla-enlaces-mudanza');
   if (!cacheEnlacesMudanza || !cacheEnlacesMudanza.length){ cont.innerHTML = '<p class="empty">Sin enlaces generados aún.</p>'; return; }
   const lista = [...cacheEnlacesMudanza].sort((a,b)=>String(b.fechaCreacion).localeCompare(String(a.fechaCreacion)));
-  cont.innerHTML = '<table><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Usos</th><th>Link</th><th></th></tr>' +
-    lista.map(e=>{
-      const link = e.linkCorto || '';
-      const bloqueado = e.reutilizable!=='si' && e.usado==='si';
-      return `<tr>
-        <td>${esc(e.nombre)||'—'}</td>
-        <td>${e.reutilizable==='si' ? '🔁 Reutilizable' : '🔗 Un solo uso'}</td>
-        <td><span class="badge ${bloqueado?'borrador':'enviada'}">${bloqueado?'usado':'activo'}</span></td>
-        <td class="mono">${esc(e.usosContados)||0}</td>
-        <td class="mono">${link ? `<a href="${esc(link)}" target="_blank">${esc(link)}</a>` : '—'}</td>
-        <td>${!bloqueado ? `<button class="icon-btn" onclick="invalidarEnlaceMudanzaBtn(${e.id})">Invalidar</button>` : ''}</td>
-      </tr>`;
-    }).join('') + '</table>';
+  const activos = lista.filter(e => !(e.reutilizable!=='si' && e.usado==='si'));
+
+  const filaHtml = (e) => {
+    const link = e.linkCorto || '';
+    const bloqueado = e.reutilizable!=='si' && e.usado==='si';
+    return `<tr>
+      <td>${esc(e.nombre)||'—'}</td>
+      <td>${e.reutilizable==='si' ? '🔁 Reutilizable' : '🔗 Un solo uso'}</td>
+      <td><span class="badge ${bloqueado?'borrador':'enviada'}">${bloqueado?'usado':'activo'}</span></td>
+      <td class="mono">${esc(e.usosContados)||0}</td>
+      <td class="mono">${link ? `<a href="${esc(link)}" target="_blank">${esc(link)}</a>` : '—'}</td>
+      <td>${!bloqueado ? `<button class="icon-btn" onclick="invalidarEnlaceMudanzaBtn(${e.id})">Invalidar</button>` : ''}</td>
+    </tr>`;
+  };
+
+  cont.innerHTML =
+    (activos.length
+      ? '<table><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Usos</th><th>Link</th><th></th></tr>' + activos.map(filaHtml).join('') + '</table>'
+      : '<p class="empty">Sin enlaces activos por el momento.</p>') +
+    '<button class="icon-btn" style="margin-top:10px;" onclick="toggleHistorialEnlacesMudanza()">Ver historial (enlaces usados/invalidados)</button>' +
+    '<div id="historial-enlaces-mudanza" style="display:none;margin-top:10px;"></div>';
+
+  const hist = document.getElementById('historial-enlaces-mudanza');
+  if (hist && hist.style.display !== 'none') renderHistorialEnlacesMudanza();
+}
+function toggleHistorialEnlacesMudanza(){
+  const cont = document.getElementById('historial-enlaces-mudanza');
+  if (cont.style.display === 'none'){ cont.style.display = 'block'; renderHistorialEnlacesMudanza(); }
+  else { cont.style.display = 'none'; }
+}
+function renderHistorialEnlacesMudanza(){
+  const cont = document.getElementById('historial-enlaces-mudanza');
+  const lista = [...cacheEnlacesMudanza].filter(e => e.reutilizable!=='si' && e.usado==='si')
+    .sort((a,b)=>String(b.fechaCreacion).localeCompare(String(a.fechaCreacion)));
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Sin enlaces en el historial todavía.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Nombre</th><th>Generado el</th><th>Usos</th></tr>' +
+    lista.map(e=>`<tr><td>${esc(e.nombre)||'—'}</td><td class="mono">${esc(e.fechaCreacion)}</td><td class="mono">${esc(e.usosContados)||0}</td></tr>`).join('') + '</table>';
 }
 async function invalidarEnlaceMudanzaBtn(id){
   if (!confirm('¿Invalidar este link? Dejará de funcionar de inmediato.')) return;
