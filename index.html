@@ -841,7 +841,7 @@
           <button class="icon-btn" onclick="cancelarEdicionMensaje()">Cancelar</button>
           <button class="icon-btn" onclick="document.getElementById('men-csv-input').click()">＋ Importar planilla (CSV)</button>
           <input type="file" id="men-csv-input" accept=".csv" style="display:none;" onchange="importarMensajesCSV(event)">
-          <p class="empty" style="margin-top:8px;">El CSV debe tener columnas: <span class="mono">fecha,canal,remitente,torre,unidad,asunto,mensaje</span> (encabezados en la primera fila). Los mensajes importados por CSV quedan en categoría <b>"Otro"</b> — reclasifícalos después desde la tabla si corresponde.</p>
+          <p class="empty" style="margin-top:8px;">El CSV debe tener columnas: <span class="mono">fecha,canal,remitente,torre,unidad,asunto,mensaje</span> (encabezados en la primera fila). Los mensajes importados por CSV se categorizan automáticamente por palabras clave (igual que antes) — revisa y reclasifica desde la tabla los que caigan en "Otro".</p>
         </div>
 
         <div class="card">
@@ -3302,6 +3302,32 @@ function formatearFechaChile(isoUTC, soloDia){
   return soloDia ? `${p.day}-${p.month}-${p.year}` : `${p.day}-${p.month}-${p.year} ${p.hour}:${p.minute}`;
 }
 
+// Portado 1:1 desde Apps Script (categorizarMensaje_ / CATEGORIAS_MENSAJES_).
+// El orden importa: se revisa de arriba hacia abajo y se queda con la primera coincidencia.
+const CATEGORIAS_MENSAJES_JS = {
+  'Multas': ['multa', 'infracción', 'infraccion', 'utm'],
+  'Documentos/Certificados': ['certificado', 'certificad'],
+  'Tarjeta de Acceso': ['tarjeta de acceso', 'tarjeta', 'extravío', 'extravio'],
+  'Acceso App/Edifito': ['acceso a la app', 'edifito', 'aplicacion', 'aplicación', 'usuario app', 'clave app'],
+  'Estacionamiento': ['estacionamiento', 'auto de mi propiedad', 'vehículo', 'vehiculo'],
+  'Mascotas/Convivencia': ['mascota', 'perro', 'gato', 'fecas', 'caca', 'ladra'],
+  'Ruidos/Disturbios': ['ruido', 'alcohol', 'droga', 'ebrio', 'indigente', 'disturbio', 'ordinario', 'molest', 'escandal'],
+  'Mantención/Fallas': ['filtración', 'filtracion', 'fuga', 'falla', 'no funciona', 'gotera', 'ascensor'],
+  'Reservas Áreas Comunes': ['reserva', 'gimnasio', 'quincho', 'salón', 'salon', 'piscina'],
+  'Gastos Comunes/Pagos': ['gasto común', 'gasto comun', 'ggcc', 'gastos comunes', 'deuda', 'transferencia', 'comprobante de pago', 'abono', 'cobranza', 'khipu', 'pagué', 'pague'],
+};
+function categorizarMensaje(texto){
+  const t = (texto || '').toLowerCase();
+  for (const categoria in CATEGORIAS_MENSAJES_JS){
+    if (CATEGORIAS_MENSAJES_JS[categoria].some(palabra => t.indexOf(palabra) !== -1)) return categoria;
+  }
+  return 'Otro';
+}
+function idCategoriaPorNombre(nombre){
+  const c = cacheCategoriasMensajes.find(x=>x.nombre===nombre);
+  return c ? c.id : null;
+}
+
 async function cargarMensajesSupabase(){
   const { data: categorias, error: e0 } = await supabaseClient
     .from('categorias').select('id, nombre').order('nombre');
@@ -3336,6 +3362,7 @@ async function cargarMensajesSupabase(){
   }));
 }
 
+let categoriaTocadaManualmente = false; // se resetea al limpiar el formulario
 function renderSelectCategoriaFormMensaje(){
   const sel = document.getElementById('men-categoria');
   if (!sel) return;
@@ -3343,6 +3370,22 @@ function renderSelectCategoriaFormMensaje(){
   sel.innerHTML = cacheCategoriasMensajes.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
   if (actual && cacheCategoriasMensajes.some(c=>String(c.id)===actual)) sel.value = actual;
 }
+function sugerirCategoriaEnVivo(){
+  if (categoriaTocadaManualmente) return; // el admin ya eligió una a mano, no se le pisa
+  const asunto = document.getElementById('men-asunto').value;
+  const mensaje = document.getElementById('men-mensaje').value;
+  const sugerida = categorizarMensaje(asunto + ' ' + mensaje);
+  const id = idCategoriaPorNombre(sugerida);
+  if (id) document.getElementById('men-categoria').value = id;
+}
+document.addEventListener('DOMContentLoaded', () => {
+  ['men-asunto','men-mensaje'].forEach(campoId => {
+    const el = document.getElementById(campoId);
+    if (el) el.addEventListener('input', sugerirCategoriaEnVivo);
+  });
+  const selCategoria = document.getElementById('men-categoria');
+  if (selCategoria) selCategoria.addEventListener('change', () => { categoriaTocadaManualmente = true; });
+});
 
 function limpiarFormularioMensaje(){
   document.getElementById('men-id').value = '';
@@ -3353,6 +3396,7 @@ function limpiarFormularioMensaje(){
   document.getElementById('men-unidad').value = '';
   document.getElementById('men-asunto').value = '';
   document.getElementById('men-mensaje').value = '';
+  categoriaTocadaManualmente = false;
   renderSelectCategoriaFormMensaje();
   document.getElementById('men-form-titulo').textContent = 'Nuevo mensaje';
 }
@@ -3370,6 +3414,7 @@ function editarMensaje(id){
   document.getElementById('men-mensaje').value = m.mensaje;
   renderSelectCategoriaFormMensaje();
   document.getElementById('men-categoria').value = m.categoria_id;
+  categoriaTocadaManualmente = true;
   document.getElementById('men-form-titulo').textContent = 'Editar mensaje';
   document.querySelector('#men-content .card:nth-child(2)').scrollIntoView({behavior:'smooth'});
 }
@@ -3441,9 +3486,8 @@ function verRespuestaSugerida(id){
   const texto = r ? r.respuesta : 'Sin respuesta tipo configurada para esta categoría.';
   abrirModalTexto('Respuesta sugerida (' + m.categoria + ')', texto);
 }
-// Los mensajes importados por CSV quedan en categoría 'Otro' (pendiente de reclasificar
-// a mano desde la tabla) — no existe hoy una regla de categorización automática por
-// palabras clave portada desde Apps Script; si la quieres, hay que definirla aparte.
+// Categorización automática por palabras clave, portada 1:1 desde Apps Script
+// (ver CATEGORIAS_MENSAJES_JS / categorizarMensaje arriba).
 async function importarMensajesCSV(evento){
   const file = evento.target.files[0];
   if (!file) return;
@@ -3458,16 +3502,17 @@ async function importarMensajesCSV(evento){
     let fechaParsed;
     try{ fechaParsed = parsearFechaMensaje(f.fecha || ''); }
     catch(e){ filasInvalidas.push(i+2); return; }
+    const nombreCategoria = categorizarMensaje((f.asunto || '') + ' ' + f.mensaje);
     mensajes.push({
       fecha: fechaParsed.iso, fecha_solo_dia: fechaParsed.soloDia,
       canal: f.canal || 'Edifito', remitente: f.remitente || '',
       torre: (f.torre||'').toUpperCase() || null, unidad: f.unidad || null,
       asunto: f.asunto || '', mensaje: f.mensaje,
-      categoria_id: categoriaOtro.id, estado: 'nuevo'
+      categoria_id: idCategoriaPorNombre(nombreCategoria) || categoriaOtro.id, estado: 'nuevo'
     });
   });
   if (!mensajes.length) return alert('No se encontraron filas válidas (falta columna "mensaje" o la fecha no tiene un formato reconocido).');
-  let confirmMsg = `Se importarán ${mensajes.length} mensajes en categoría "Otro". ¿Continuar?`;
+  let confirmMsg = `Se importarán ${mensajes.length} mensajes, categorizados automáticamente por palabras clave (igual que antes). ¿Continuar?`;
   if (filasInvalidas.length) confirmMsg += `\n(${filasInvalidas.length} filas se omiten por fecha inválida: filas ${filasInvalidas.join(', ')})`;
   if (!confirm(confirmMsg)) return;
   const { error } = await supabaseClient.from('mensajes').insert(mensajes);
