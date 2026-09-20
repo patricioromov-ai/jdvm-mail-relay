@@ -92,6 +92,29 @@
   .quote-answer{background:#fff;border:1px solid var(--line);border-radius:5px;padding:10px 12px;font-size:0.84rem;margin-bottom:8px;color:var(--ink-soft);}
   .empty{color:var(--pending);font-size:0.85rem;padding:10px 0;}
   .config-banner{background:#F7E4E4;border:1px solid var(--err);color:var(--err);padding:14px 18px;border-radius:6px;margin-bottom:20px;font-size:0.85rem;}
+  /* ===== Catastro de unidades ===== */
+  .cat-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .cat-tab{padding:7px 14px;font-size:0.83rem;font-family:inherit;border-radius:5px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--ink-soft);}
+  .cat-tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .cat-tab .n{display:inline-block;min-width:18px;padding:0 6px;margin-left:4px;border-radius:10px;background:var(--torre-a);color:#fff;font-size:0.7rem;text-align:center;}
+  .cat-filtros{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .cat-filtros select,.cat-filtros input{padding:8px 10px;border:1px solid var(--line);border-radius:5px;background:#fff;font-family:inherit;font-size:0.85rem;}
+  .cat-filtros input{flex:1;min-width:220px;}
+  .cat-acciones{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .cat-jornada{display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--ink-soft);}
+  .cat-jornada input{width:64px;padding:6px 8px;border:1px solid var(--line);border-radius:5px;font-family:inherit;}
+  .cat-progreso{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
+  .cat-fila-prueba td{background:#F3EEFA;}
+  .cat-sec{border:1px solid var(--line);border-radius:6px;background:#fff;padding:10px 14px;margin:0 0 10px;}
+  .cat-sec label.cab{display:flex;align-items:center;gap:8px;font-size:0.9rem;cursor:pointer;}
+  .cat-sec ul{margin:8px 0 0 26px;padding:0;list-style:disc;font-size:0.84rem;color:var(--ink-soft);}
+  .cat-sec li{margin-bottom:3px;}
+  .cat-sec .ant{color:var(--pending);text-decoration:line-through;}
+  .cat-sec .sens{color:var(--torre-c);font-weight:600;}
+  .cat-obs{background:#F2E8DA;border-left:4px solid var(--torre-c);padding:10px 14px;border-radius:5px;font-size:0.85rem;margin-bottom:12px;}
+  .cat-resp-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .cat-resp-cab h3{margin:0 0 2px;}
+  #cat-modal iframe{width:100%;flex:1;min-height:440px;border:1px solid var(--line);border-radius:6px;background:#fff;}
   @media(prefers-reduced-motion: reduce){*{transition:none !important;}}
   @media (max-width: 780px){
     .app{flex-direction:column;} .sidebar{width:100%;flex-direction:row;overflow-x:auto;padding:12px 0;}
@@ -118,6 +141,7 @@
       <div class="nav-item" data-view="mudanzas"><span class="ic">🚚</span> Mudanzas</div>
       <div class="nav-item" data-view="tarjetas"><span class="ic">🪪</span> Tarjetas Acceso</div>
       <div class="nav-item" data-view="formularios"><span class="ic">📝</span> Formularios</div>
+      <div class="nav-item" data-view="catastro"><span class="ic">🏠</span> Catastro</div>
       <div class="nav-item" data-view="mensajes"><span class="ic">💬</span> Mensajes</div>
       <div class="nav-item" data-view="anomalias"><span class="ic">⚠</span> Anomalías</div>
       <div class="nav-item" data-view="config"><span class="ic">⚙</span> Configuración</div>
@@ -803,6 +827,114 @@
       <div class="card" id="card-inscritos" style="display:none;">
         <h3 id="inscritos-titulo">Inscritos</h3>
         <div id="tabla-inscritos"></div>
+      </div>
+    </section>
+
+    <!-- CATASTRO DE UNIDADES (módulo aparte: backend en Catastro.gs) -->
+    <section class="view" id="view-catastro">
+      <div class="topline">
+        <div><h2>Catastro de unidades</h2><p>Actualización periódica de propietarios, residentes, arrendatarios, estacionamientos y bodegas</p></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select id="cat-proceso" onchange="catCambiarProceso()" style="padding:8px 10px;border:1px solid var(--line);border-radius:5px;background:#fff;font-family:inherit;font-size:0.85rem;"></select>
+          <button class="icon-btn" onclick="toggleForm('cat-form-proceso')">＋ Nuevo proceso</button>
+          <button class="icon-btn" id="cat-btn-cerrar" onclick="catCerrarProceso(this)">Cerrar proceso</button>
+        </div>
+      </div>
+
+      <div class="card" id="cat-form-proceso" style="display:none;">
+        <h3>Nuevo proceso de actualización</h3>
+        <p class="empty" style="margin-bottom:12px;">Cada proceso es una ronda (por ejemplo, una por semestre). Al crearlo no se envía nada: primero eliges a quién enviar. Solo puede haber un proceso abierto a la vez.</p>
+        <div class="form-grid">
+          <div class="form-row"><label>Nombre</label><input type="text" id="cat-p-nombre" placeholder="Ej. Catastro 2026 · 2º semestre"></div>
+          <div class="form-row"><label>Días de vigencia de cada enlace</label><input type="text" id="cat-p-dias" value="30" inputmode="numeric"></div>
+        </div>
+        <button class="btn-primary" onclick="catCrearProceso(this)">Crear proceso</button>
+        <button class="icon-btn" onclick="toggleForm('cat-form-proceso')">Cancelar</button>
+      </div>
+
+      <div class="grid-stats" id="cat-stats"></div>
+
+      <div class="cat-tabs" role="tablist">
+        <button class="cat-tab active" data-cat-tab="unidades" onclick="catTab('unidades')">Unidades y envío</button>
+        <button class="cat-tab" data-cat-tab="respuestas" onclick="catTab('respuestas')">Respuestas por revisar <span id="cat-badge-resp"></span></button>
+        <button class="cat-tab" data-cat-tab="historial" onclick="catTab('historial')">Historial de cambios</button>
+        <button class="cat-tab" data-cat-tab="herramientas" onclick="catTab('herramientas')">Herramientas</button>
+      </div>
+
+      <!-- Unidades y envío -->
+      <div id="cat-tab-unidades">
+        <div class="card">
+          <div class="cat-filtros">
+            <select id="cat-f-torre" onchange="renderCatUnidades()"><option value="">Todas las torres</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+            <select id="cat-f-envio" onchange="renderCatUnidades()">
+              <option value="">Cualquier envío</option><option value="sin_enviar">Sin enviar</option><option value="enviado">Enviado</option>
+              <option value="error">Con error</option><option value="rebotado">Rebotado</option><option value="problema">Sin correo válido</option>
+            </select>
+            <select id="cat-f-resp" onchange="renderCatUnidades()">
+              <option value="">Cualquier respuesta</option><option value="sin_respuesta">Sin respuesta</option><option value="pendiente_revision">Por revisar</option>
+              <option value="confirmado">Confirmado</option><option value="aplicado">Actualizado</option><option value="rechazado">Rechazado</option>
+            </select>
+            <input type="text" id="cat-f-buscar" placeholder="Buscar por unidad, propietario o correo..." oninput="renderCatUnidades()">
+          </div>
+          <div class="cat-acciones">
+            <button class="icon-btn" onclick="catSelVisibles()">Seleccionar visibles</button>
+            <button class="icon-btn" onclick="catLimpiarSel()">Limpiar selección</button>
+            <span id="cat-sel-conteo" class="mono">0 seleccionadas</span>
+            <span style="flex:1;"></span>
+            <label class="cat-jornada" title="Muchos proveedores de correo limitan los envíos por día. Las unidades que queden pendientes las envías otro día.">Máx. por jornada <input type="text" id="cat-max-jornada" value="300" inputmode="numeric"></label>
+            <button class="btn-primary" id="cat-btn-enviar" onclick="catEnviar('solicitud')">Enviar solicitud</button>
+            <button class="icon-btn" id="cat-btn-recordar" onclick="catEnviar('recordatorio')">Enviar recordatorio</button>
+          </div>
+          <div id="cat-progreso" class="cat-progreso" style="display:none;">
+            <div class="bar-track"><div class="bar-fill alt" id="cat-progreso-barra" style="width:0%;"></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:10px;">
+              <span id="cat-progreso-texto" style="font-size:0.85rem;"></span>
+              <button class="icon-btn" id="cat-btn-pausar" onclick="catPausarEnvio()">Pausar</button>
+            </div>
+          </div>
+        </div>
+        <div class="card"><div id="cat-tabla-unidades"><p class="empty">Cargando...</p></div></div>
+      </div>
+
+      <!-- Respuestas por revisar -->
+      <div id="cat-tab-respuestas" style="display:none;">
+        <p class="empty" style="margin-bottom:12px;">Lo que responde cada propietario no modifica el catastro ni Contactos hasta que lo apruebes aquí. Puedes aplicar solo algunas secciones. Los cambios marcados con ⚠ (correo, números de estacionamiento o bodega) conviene verificarlos.</p>
+        <div id="cat-respuestas"><p class="empty">Cargando...</p></div>
+      </div>
+
+      <!-- Historial -->
+      <div id="cat-tab-historial" style="display:none;">
+        <div class="card">
+          <div class="cat-filtros"><input type="text" id="cat-h-buscar" placeholder="Filtrar por unidad, campo o valor..." oninput="renderCatHistorial()"></div>
+          <div id="cat-historial"><p class="empty">Cargando...</p></div>
+        </div>
+      </div>
+
+      <!-- Herramientas -->
+      <div id="cat-tab-herramientas" style="display:none;">
+        <div class="card">
+          <h3>Unidad de prueba</h3>
+          <p class="empty" style="margin-bottom:12px;">Crea una unidad ficticia (T-999) con una ficha completa: dos residentes, arrendatario, corredora, estacionamiento con vehículo, bodega, contacto de emergencia y una persona autorizada. Al enviarle la solicitud recibes el correo real y puedes recorrer todo el flujo (formulario, revisión, aplicación) sin tocar ningún dato de Contactos. Se elimina cuando termines.</p>
+          <div class="form-grid">
+            <div class="form-row"><label>Correo donde recibirás la prueba</label><input type="email" id="cat-prueba-email" placeholder="tu-correo@jdvm.cl"></div>
+          </div>
+          <button class="btn-primary" onclick="catCrearPrueba(this)">Crear unidad de prueba</button>
+          <button class="icon-btn" onclick="catEliminarPrueba(this)">Eliminar unidad de prueba</button>
+        </div>
+
+        <div class="card">
+          <h3>Cargar residentes ya conocidos</h3>
+          <p class="empty" style="margin-bottom:12px;">Opcional, para partir con datos en la primera ronda. Una persona por línea: <span class="mono">Torre; Unidad; Nombre completo</span>. Los propietarios verán a estas personas ya cargadas y solo tendrán que confirmarlas. Si alguien ya está registrado, no se duplica.</p>
+          <div class="form-row"><textarea id="cat-import-texto" placeholder="A; 0501; María Pérez González&#10;A; 0501; Juan Pérez Soto&#10;B; 609; Camila Rojas"></textarea></div>
+          <button class="btn-primary" onclick="catImportarResidentes(this)">Cargar residentes</button>
+          <div id="cat-import-resultado" class="empty" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card">
+          <h3>Descargar catastro vigente</h3>
+          <p class="empty" style="margin-bottom:12px;">Una fila por unidad con todo lo registrado hasta hoy (propietario, personas que viven, arrendatario, corredora, estacionamiento y patente, bodega, emergencia y autorizados). Incluye RUT: trátalo como archivo confidencial. Se abre directo en Excel.</p>
+          <button class="btn-primary" onclick="catExportar(this)">Descargar CSV</button>
+        </div>
       </div>
     </section>
 
@@ -3883,6 +4015,458 @@ function esc(s){
   if (s===undefined || s===null) return '';
   return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+
+// ========= CATASTRO DE UNIDADES =========
+// Módulo aparte: todo el backend vive en Catastro.gs (acciones "catastro...").
+// Este bloque solo necesita api(), esc(), iniciarCarga()/finCarga() y toggleForm() de más arriba.
+let catProcesos = [], catProcesoId = '', catUnidades = [], catRespuestas = [], catCambios = [];
+let catSel = new Set(), catEnvioActivo = false, catPausar = false, catTabActual = 'unidades', catUltimoCorreoPrueba = '';
+const CAT_TAMANO_LOTE = 8;
+
+document.querySelector('.nav-item[data-view="catastro"]').addEventListener('click', () => { catCargar(); });
+window.addEventListener('beforeunload', (ev) => { if (catEnvioActivo) { ev.preventDefault(); ev.returnValue = ''; } });
+
+function catProcesoActual(){ return catProcesos.find(p => String(p.id) === String(catProcesoId)) || null; }
+function catFecha(iso){ return iso ? formatearFechaLocal(iso) : '—'; }
+
+async function catCargar(){
+  try{
+    catProcesos = await api('catastroListProcesos');
+    const abierto = catProcesos.filter(p => p.estado === 'abierto').pop();
+    if (!catProcesoActual()) catProcesoId = abierto ? abierto.id : (catProcesos.length ? catProcesos[catProcesos.length - 1].id : '');
+    renderCatProcesos();
+    await catRecargarDatos();
+  }catch(e){ /* el error ya se muestra en el banner */ }
+}
+
+async function catRecargarDatos(){
+  try{
+    if (catProcesoId){
+      [catUnidades, catRespuestas] = await Promise.all([
+        api('catastroListUnidades', { procesoId: catProcesoId }),
+        api('catastroListRespuestas', { procesoId: catProcesoId })
+      ]);
+    } else {
+      catUnidades = await api('catastroListUnidades', { procesoId: '' });
+      catRespuestas = [];
+    }
+    renderCatStats(); renderCatUnidades(); renderCatRespuestas();
+  }catch(e){}
+}
+
+function renderCatProcesos(){
+  const sel = document.getElementById('cat-proceso');
+  if (!catProcesos.length){
+    sel.innerHTML = '<option value="">Sin procesos aún</option>';
+  } else {
+    sel.innerHTML = catProcesos.slice().reverse().map(p =>
+      `<option value="${esc(p.id)}" ${String(p.id) === String(catProcesoId) ? 'selected' : ''}>${esc(p.nombre)} (${p.estado})</option>`).join('');
+  }
+  const p = catProcesoActual();
+  document.getElementById('cat-btn-cerrar').style.display = p && p.estado === 'abierto' ? '' : 'none';
+  if (!catProcesos.length) document.getElementById('cat-form-proceso').style.display = 'block';
+}
+
+async function catCambiarProceso(){
+  catProcesoId = document.getElementById('cat-proceso').value;
+  catSel.clear();
+  renderCatProcesos();
+  await catRecargarDatos();
+}
+
+async function catCrearProceso(boton){
+  const nombre = document.getElementById('cat-p-nombre').value.trim();
+  const dias = parseInt(document.getElementById('cat-p-dias').value, 10) || 30;
+  if (!nombre) return alert('Escribe un nombre para el proceso.');
+  if (!iniciarCarga(boton, 'Creando...')) return;
+  try{
+    const p = await api('catastroCrearProceso', { nombre, diasVigencia: dias });
+    catProcesoId = p.id;
+    document.getElementById('cat-p-nombre').value = '';
+    document.getElementById('cat-form-proceso').style.display = 'none';
+    finCarga(boton);
+    await catCargar();
+  }catch(e){ finCarga(boton); alert(e.message); }
+}
+
+async function catCerrarProceso(boton){
+  const p = catProcesoActual();
+  if (!p) return;
+  if (!confirm('¿Cerrar "' + p.nombre + '"?\n\nLos enlaces enviados dejarán de funcionar y ya no se podrán enviar correos de este proceso. Las respuestas pendientes de revisión se conservan, pero conviene revisarlas antes de cerrar.')) return;
+  if (!iniciarCarga(boton, 'Cerrando...')) return;
+  try{ await api('catastroCerrarProceso', { id: p.id }); finCarga(boton); await catCargar(); }
+  catch(e){ finCarga(boton); alert(e.message); }
+}
+
+function catTab(nombre){
+  catTabActual = nombre;
+  document.querySelectorAll('.cat-tab').forEach(t => t.classList.toggle('active', t.dataset.catTab === nombre));
+  ['unidades', 'respuestas', 'historial', 'herramientas'].forEach(n => {
+    document.getElementById('cat-tab-' + n).style.display = n === nombre ? 'block' : 'none';
+  });
+  if (nombre === 'historial') catCargarHistorial();
+}
+
+// ---------- estadísticas ----------
+function renderCatStats(){
+  const reales = catUnidades.filter(u => !u.esPrueba);
+  const cuenta = f => reales.filter(f).length;
+  const tarjetas = [
+    ['Unidades', reales.length],
+    ['Sin correo válido', cuenta(u => u.problema && !u.delegado)],
+    ['Solicitudes enviadas', cuenta(u => u.estadoEnvio === 'enviado')],
+    ['Sin respuesta', cuenta(u => u.estadoEnvio === 'enviado' && u.estadoRespuesta === 'sin_respuesta')],
+    ['Por revisar', cuenta(u => u.estadoRespuesta === 'pendiente_revision')],
+    ['Confirmadas sin cambios', cuenta(u => u.estadoRespuesta === 'confirmado')],
+    ['Actualizadas', cuenta(u => u.estadoRespuesta === 'aplicado')],
+    ['Con error o rebote', cuenta(u => u.estadoEnvio === 'error' || u.estadoEnvio === 'rebotado')]
+  ];
+  document.getElementById('cat-stats').innerHTML = tarjetas.map(t =>
+    `<div class="stat-card"><div class="num">${t[1]}</div><div class="lbl">${t[0]}</div></div>`).join('');
+  const nRev = catRespuestas.length;
+  document.getElementById('cat-badge-resp').innerHTML = nRev ? `<span class="n">${nRev}</span>` : '';
+}
+
+// ---------- unidades y envío ----------
+function catBadgeEnvio(u){
+  if (!u.estadoEnvio){
+    if (u.problema === 'sin_propietario') return '<span class="badge err">Sin propietario</span>';
+    if (u.problema) return '<span class="badge err">Sin correo válido</span>';
+    return '<span class="badge borrador">Sin enviar</span>';
+  }
+  const mapa = {
+    enviado: ['enviada', 'Enviado'], pendiente: ['borrador', 'Pendiente'], enviando: ['enviando', 'Enviando'],
+    error: ['err', 'Error'], sin_correo: ['err', 'Sin correo válido'], rebotado: ['err', 'Rebotado']
+  };
+  const m = mapa[u.estadoEnvio] || ['borrador', u.estadoEnvio];
+  const veces = u.estadoEnvio === 'enviado' && u.nEnvios > 1 ? ` <span class="mono">×${u.nEnvios}</span>` : '';
+  return `<span class="badge ${m[0]}" ${u.ultimoError ? `title="${esc(u.ultimoError)}"` : ''}>${m[1]}</span>${veces}`;
+}
+
+function catBadgeResp(u){
+  if (u.estadoRespuesta === 'sin_respuesta') return u.estadoEnvio === 'enviado' ? '<span class="badge borrador">Sin respuesta</span>' : '<span style="color:var(--pending);">—</span>';
+  const mapa = {
+    pendiente_revision: ['en_revision', 'Por revisar'], confirmado: ['respondido', 'Confirmado'],
+    aplicado: ['actualizacion', 'Actualizado'], rechazado: ['err', 'Rechazado']
+  };
+  const m = mapa[u.estadoRespuesta];
+  return m ? `<span class="badge ${m[0]}">${m[1]}</span>` : '<span style="color:var(--pending);">—</span>';
+}
+
+function catFiltradas(){
+  const torre = document.getElementById('cat-f-torre').value;
+  const envio = document.getElementById('cat-f-envio').value;
+  const resp = document.getElementById('cat-f-resp').value;
+  const b = (document.getElementById('cat-f-buscar').value || '').toLowerCase().trim();
+  return catUnidades.filter(u => {
+    if (torre && u.torre !== torre) return false;
+    if (envio === 'sin_enviar' && (u.estadoEnvio || u.problema)) return false;
+    if (envio === 'problema' && !u.problema) return false;
+    if (['enviado', 'error', 'rebotado'].includes(envio) && u.estadoEnvio !== envio) return false;
+    if (resp && u.estadoRespuesta !== resp) return false;
+    if (b && !(`${u.torre}-${u.unidad} ${u.torre} ${u.unidad} ${u.propietario} ${u.email}`.toLowerCase().includes(b))) return false;
+    return true;
+  });
+}
+
+function renderCatUnidades(){
+  const cont = document.getElementById('cat-tabla-unidades');
+  if (!catProcesoId){
+    cont.innerHTML = '<p class="empty">Crea un proceso (arriba) para poder enviar solicitudes. Mientras tanto puedes usar la pestaña Herramientas.</p>';
+    catActualizaConteoSel(); return;
+  }
+  const lista = catFiltradas();
+  if (!lista.length){ cont.innerHTML = '<p class="empty">No hay unidades que coincidan con los filtros.</p>'; catActualizaConteoSel(); return; }
+  const p = catProcesoActual();
+  const abierto = p && p.estado === 'abierto';
+  cont.innerHTML = `<p class="empty" style="margin-bottom:8px;">${lista.length} de ${catUnidades.length} unidades</p>` +
+    '<table><tr><th></th><th>Unidad</th><th>Propietario</th><th>Correo</th><th>Envío</th><th>Respuesta</th><th>Último movimiento</th><th></th></tr>' +
+    lista.map(u => {
+      const fecha = u.fechaRespuesta || u.fechaEnvio || '';
+      const acciones = [`<button class="icon-btn" onclick="catVistaPrevia('${esc(u.key)}')">Vista previa</button>`];
+      if (u.estadoRespuesta === 'pendiente_revision') acciones.push(`<button class="icon-btn" onclick="catTab('respuestas')">Revisar</button>`);
+      if (abierto && !['confirmado', 'aplicado', 'rechazado'].includes(u.estadoRespuesta) && u.problema !== 'sin_propietario') acciones.push(`<button class="icon-btn" title="Envía el mismo enlace personal a otra dirección, a solicitud del propietario" onclick="catAbrirDelegar('${esc(u.key)}')">Enviar a otra persona</button>`);
+      if (u.envioId && u.estadoEnvio === 'enviado' && u.estadoRespuesta === 'sin_respuesta') acciones.push(`<button class="icon-btn" title="El correo volvió como no entregado" onclick="catRebotado('${esc(u.envioId)}')">Rebotó</button>`);
+      if (u.envioId && ['confirmado', 'aplicado', 'rechazado'].includes(u.estadoRespuesta)) acciones.push(`<button class="icon-btn" title="Vuelve a habilitar el enlace" onclick="catReabrir('${esc(u.envioId)}')">Reabrir</button>`);
+      return `<tr class="${u.esPrueba ? 'cat-fila-prueba' : ''}">
+        <td><input type="checkbox" ${catSel.has(u.key) ? 'checked' : ''} ${abierto && (!u.problema || u.delegado) ? '' : 'disabled'} onchange="catToggleSel('${esc(u.key)}', this.checked)" aria-label="Seleccionar ${esc(u.torre)}-${esc(u.unidad)}"></td>
+        <td><span class="torre-tab ${esc(String(u.torre).toLowerCase())}"></span>${esc(u.torre)} · ${esc(u.unidad)}${u.esPrueba ? ' <span class="badge en_revision">PRUEBA</span>' : ''}${u.nPropietarios > 1 ? ' <span class="badge borrador" title="Hay más de un propietario: el correo va solo al primero con correo válido">' + u.nPropietarios + ' prop.</span>' : ''}</td>
+        <td>${esc(u.propietario) || '—'}</td>
+        <td class="mono">${esc(u.email) || '—'}${u.delegado ? `<div style="font-size:0.72rem;color:var(--ink-soft);">Delegado: ${esc(u.delegadoNombre ? u.delegadoNombre + ' · ' : '')}${esc(u.delegadoEmail)}</div>` : ''}</td>
+        <td>${catBadgeEnvio(u)}</td>
+        <td>${catBadgeResp(u)}</td>
+        <td class="mono">${fecha ? catFecha(fecha) : '—'}</td>
+        <td style="white-space:nowrap;">${acciones.join(' ')}</td></tr>`;
+    }).join('') + '</table>';
+  catActualizaConteoSel();
+}
+
+function catActualizaConteoSel(){
+  const el = document.getElementById('cat-sel-conteo');
+  if (el) el.textContent = catSel.size + (catSel.size === 1 ? ' seleccionada' : ' seleccionadas');
+}
+function catToggleSel(key, on){ if (on) catSel.add(key); else catSel.delete(key); catActualizaConteoSel(); }
+function catSelVisibles(){
+  const p = catProcesoActual();
+  if (!p || p.estado !== 'abierto') return alert('El proceso está cerrado.');
+  catFiltradas().forEach(u => { if ((!u.problema || u.delegado) && !u.esPrueba) catSel.add(u.key); });
+  renderCatUnidades();
+}
+function catLimpiarSel(){ catSel.clear(); renderCatUnidades(); }
+
+async function catRebotado(envioId){
+  if (!confirm('¿Marcar este correo como rebotado (no entregado)?')) return;
+  try{ await api('catastroMarcarRebotado', { envioId }); await catRecargarDatos(); }catch(e){}
+}
+async function catReabrir(envioId){
+  if (!confirm('¿Reabrir el enlace de esta unidad?\n\nLa respuesta anterior se descarta y el propietario podrá responder de nuevo con el mismo enlace.')) return;
+  try{ await api('catastroReabrirEnvio', { envioId }); await catRecargarDatos(); }catch(e){}
+}
+
+// ---------- vista previa y prueba ----------
+let catPreviaKey = '';
+async function catVistaPrevia(key){
+  try{
+    const r = await api('catastroVistaPreviaCorreo', { procesoId: catProcesoId, key });
+    catPreviaKey = key;
+    document.getElementById('cat-modal-titulo').textContent = 'Vista previa del correo — ' + key;
+    document.getElementById('cat-modal-meta').innerHTML = '<b>Para:</b> ' + esc(r.para) + '<br><b>Asunto:</b> ' + esc(r.asunto) + (r.tieneCorreo ? '' : '<br><span style="color:var(--err);">Esta unidad no tiene un correo válido: no se puede enviar.</span>');
+    document.getElementById('cat-modal-frame').srcdoc = '<meta charset="utf-8"><body style="margin:16px;font-family:Arial,sans-serif;">' + r.html + '</body>';
+    document.getElementById('cat-btn-solo-esta').style.display = r.tieneCorreo && catProcesoActual() && catProcesoActual().estado === 'abierto' ? '' : 'none';
+    document.getElementById('cat-modal').style.display = 'flex';
+  }catch(e){}
+}
+function catCerrarModal(){ document.getElementById('cat-modal').style.display = 'none'; document.getElementById('cat-modal-frame').srcdoc = ''; }
+
+async function catEnviarPrueba(boton){
+  const email = prompt('¿A qué correo envío esta prueba? (llega con el asunto [PRUEBA] y un enlace deshabilitado)', catUltimoCorreoPrueba);
+  if (!email) return;
+  if (!iniciarCarga(boton, 'Enviando...')) return;
+  try{
+    await api('catastroEnviarPrueba', { procesoId: catProcesoId, key: catPreviaKey, email: email.trim() });
+    catUltimoCorreoPrueba = email.trim();
+    finCarga(boton, 'Enviado ✓');
+  }catch(e){ finCarga(boton); alert(e.message); }
+}
+
+async function catEnviarSoloEsta(boton){
+  if (!confirm('¿Enviar la solicitud real solo a la unidad ' + catPreviaKey + '?')) return;
+  if (!iniciarCarga(boton, 'Enviando...')) return;
+  try{
+    const r = await api('catastroEnviarLote', { procesoId: catProcesoId, keys: [catPreviaKey], reenviar: false });
+    const x = r.resultados[0] || {};
+    finCarga(boton);
+    alert(x.estado === 'enviado' ? 'Solicitud enviada.' : (x.estado === 'omitido' && x.detalle === 'ya_enviado' ? 'Esta unidad ya recibió la solicitud. Para reenviarla, selecciónala en la tabla y usa "Enviar solicitud".' : 'No se envió: ' + (x.detalle || x.estado)));
+    catCerrarModal();
+    await catRecargarDatos();
+  }catch(e){ finCarga(boton); alert(e.message); }
+}
+
+// ---------- enviar el enlace a otra persona (delegación) ----------
+let catDelegarKey = '';
+function catAbrirDelegar(key){
+  const u = catUnidades.find(x => x.key === key);
+  if (!u) return;
+  catDelegarKey = key;
+  document.getElementById('cat-deleg-titulo').textContent = 'Enviar a otra persona — ' + u.torre + ' · ' + u.unidad;
+  document.getElementById('cat-deleg-actual').innerHTML = u.delegado
+    ? 'Ya se envió a <b>' + esc(u.delegadoEmail) + '</b>. Si envías a otra dirección, el enlace anterior seguirá funcionando y ambos podrán responder.'
+    : (u.problema ? 'Esta unidad no tiene un correo válido del propietario: es una buena forma de contactarla.' : 'El propietario (' + esc(u.email) + ') seguirá pudiendo usar su enlace.');
+  document.getElementById('cat-deleg-email').value = '';
+  document.getElementById('cat-deleg-nombre').value = '';
+  document.getElementById('cat-modal-deleg').style.display = 'flex';
+  document.getElementById('cat-deleg-email').focus();
+}
+function catCerrarDelegar(){ document.getElementById('cat-modal-deleg').style.display = 'none'; }
+async function catEnviarDelegado(boton){
+  const email = document.getElementById('cat-deleg-email').value.trim();
+  const nombre = document.getElementById('cat-deleg-nombre').value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return alert('Escribe un correo válido.');
+  if (!confirm('Se enviará el enlace personal de la unidad ' + catDelegarKey + ' a ' + email + '.\n\nHazlo solo si el propietario te lo pidió. Quedará registrado en el historial.\n\n¿Enviar?')) return;
+  if (!iniciarCarga(boton, 'Enviando...')) return;
+  try{
+    await api('catastroEnviarDelegado', { procesoId: catProcesoId, key: catDelegarKey, email, nombre });
+    finCarga(boton);
+    catCerrarDelegar();
+    await catRecargarDatos();
+    alert('Enviado a ' + email + '.');
+  }catch(e){ finCarga(boton); alert(e.message); }
+}
+
+// ---------- envío masivo por tandas ----------
+function catPausarEnvio(){ catPausar = true; document.getElementById('cat-btn-pausar').textContent = 'Pausando...'; document.getElementById('cat-btn-pausar').disabled = true; }
+
+async function catEnviar(modo){
+  if (catEnvioActivo) return;
+  const p = catProcesoActual();
+  if (!p || p.estado !== 'abierto') return alert('Necesitas un proceso abierto para enviar.');
+  const seleccion = Array.from(catSel).map(k => catUnidades.find(u => u.key === k)).filter(Boolean);
+  if (!seleccion.length) return alert('Selecciona primero las unidades (usa "Seleccionar visibles" o marca casillas en la tabla).');
+
+  let objetivo, reenviar = false;
+  if (modo === 'recordatorio'){
+    objetivo = seleccion.filter(u => u.estadoEnvio === 'enviado' && u.estadoRespuesta === 'sin_respuesta' && u.nEnvios < 4);
+    const omitidas = seleccion.length - objetivo.length;
+    if (!objetivo.length) return alert('Ninguna de las seleccionadas necesita recordatorio (deben estar enviadas, sin respuesta, y con menos de 3 recordatorios).');
+    if (!confirm(`Se enviará un recordatorio a ${objetivo.length} unidades que aún no responden.` + (omitidas ? `\n(${omitidas} de las seleccionadas se omiten: ya respondieron, no se han enviado o alcanzaron el máximo de 3 recordatorios.)` : '') + '\n\n¿Continuar?')) return;
+  } else {
+    const yaEnviadas = seleccion.filter(u => u.estadoEnvio === 'enviado');
+    objetivo = seleccion.filter(u => u.estadoEnvio !== 'enviado' && !u.problema);
+    if (yaEnviadas.length && confirm(`${yaEnviadas.length} de las seleccionadas ya recibieron la solicitud en este proceso.\n\nAceptar = reenviárselas también.\nCancelar = omitirlas.`)){
+      objetivo = objetivo.concat(yaEnviadas); reenviar = true;
+    }
+    if (!objetivo.length) return alert('No hay unidades pendientes de envío entre las seleccionadas.');
+    const max = parseInt(document.getElementById('cat-max-jornada').value, 10) || 0;
+    let recortadas = 0;
+    if (max > 0 && objetivo.length > max){ recortadas = objetivo.length - max; objetivo = objetivo.slice(0, max); }
+    const hayPrueba = objetivo.some(u => u.esPrueba);
+    if (!confirm(`Se enviarán ${objetivo.length} correos personalizados${hayPrueba ? ' (incluye la unidad de prueba)' : ''}.\nCada propietario recibe solo el resumen de su propia unidad y un enlace único que vence en ${p.diasVigencia} días.` + (recortadas ? `\n\nPor el límite por jornada quedan ${recortadas} para otro día.` : '') + '\n\n¿Continuar?')) return;
+  }
+
+  catEnvioActivo = true; catPausar = false;
+  const panel = document.getElementById('cat-progreso'), barra = document.getElementById('cat-progreso-barra'), texto = document.getElementById('cat-progreso-texto');
+  const btnPausa = document.getElementById('cat-btn-pausar');
+  panel.style.display = 'block'; btnPausa.disabled = false; btnPausa.textContent = 'Pausar';
+  document.getElementById('cat-btn-enviar').disabled = true; document.getElementById('cat-btn-recordar').disabled = true;
+
+  let enviados = 0, errores = 0, omitidos = 0, procesados = 0, interrumpido = '';
+  for (let i = 0; i < objetivo.length; i += CAT_TAMANO_LOTE){
+    if (catPausar) break;
+    const chunk = objetivo.slice(i, i + CAT_TAMANO_LOTE).map(u => u.key);
+    texto.textContent = `Enviando ${procesados + 1}–${procesados + chunk.length} de ${objetivo.length}...`;
+    try{
+      const r = await api('catastroEnviarLote', { procesoId: p.id, keys: chunk, reenviar, recordatorio: modo === 'recordatorio' });
+      r.resultados.forEach(x => { if (x.estado === 'enviado') enviados++; else if (x.estado === 'error') errores++; else omitidos++; });
+    }catch(e){
+      interrumpido = e.message; break;
+    }
+    procesados += chunk.length;
+    barra.style.width = Math.round(procesados / objetivo.length * 100) + '%';
+  }
+
+  catEnvioActivo = false;
+  document.getElementById('cat-btn-enviar').disabled = false; document.getElementById('cat-btn-recordar').disabled = false;
+  const resumen = `${enviados} enviados · ${errores} con error · ${omitidos} omitidos` + (catPausar ? ' · pausado, puedes continuar cuando quieras' : '') + (interrumpido ? ' · se interrumpió: ' + interrumpido : '');
+  texto.textContent = resumen;
+  catSel.clear();
+  await catRecargarDatos();
+  if (interrumpido) alert('El envío se interrumpió.\n\n' + interrumpido + '\n\nLas unidades ya enviadas quedaron marcadas. Revisa la tabla antes de volver a enviar para no duplicar correos.');
+}
+
+// ---------- respuestas por revisar ----------
+function renderCatRespuestas(){
+  const cont = document.getElementById('cat-respuestas');
+  if (!catRespuestas.length){ cont.innerHTML = '<p class="empty">No hay respuestas pendientes de revisión.</p>'; return; }
+  cont.innerHTML = catRespuestas.map(r => `
+    <div class="card" data-envio="${esc(r.envioId)}">
+      <div class="cat-resp-cab">
+        <div><h3>Torre ${esc(r.torre)} · ${esc(r.unidad)} ${r.esPrueba ? '<span class="badge en_revision">PRUEBA</span>' : ''}</h3>
+        <p style="margin:0;color:var(--ink-soft);font-size:0.85rem;">Propietario: ${esc(r.propietario)} · respondió ${catFecha(r.fechaRespuesta)}</p></div>
+      </div>
+      ${r.respondidoPor ? `<div class="cat-obs"><b>Completado por:</b> ${esc(r.respondidoPor)} (enlace enviado a ${esc(r.delegadoEmail)} a solicitud del propietario)</div>` : ''}
+      ${r.observaciones ? `<div class="cat-obs"><b>Observaciones del propietario:</b> ${esc(r.observaciones)}</div>` : ''}
+      ${r.multiplesArrendatarios ? '<div class="cat-obs">Esta unidad tiene más de un contacto arrendatario en Contactos: al aplicar, solo se actualiza el primero.</div>' : ''}
+      ${r.secciones.length ? r.secciones.map(s => `
+        <div class="cat-sec">
+          <label class="cab"><input type="checkbox" checked data-sec="${esc(s.id)}"> <b>${esc(s.titulo)}</b></label>
+          <ul>${s.lineas.map(l => `<li>${l.sensible ? '<span class="sens">⚠ </span>' : ''}${esc(l.etiqueta)}: ${l.anterior ? `<span class="ant">${esc(l.anterior)}</span> → ` : ''}<b>${esc(l.nuevo) || '(sin dato)'}</b></li>`).join('')}</ul>
+        </div>`).join('') : '<p class="empty">No modificó datos: solo dejó observaciones.</p>'}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+        <button class="btn-primary" onclick="catAplicar('${esc(r.envioId)}', this)">${r.secciones.length ? 'Aplicar las secciones marcadas' : 'Marcar como revisada'}</button>
+        <button class="icon-btn" onclick="catRechazar('${esc(r.envioId)}', this)">Rechazar respuesta</button>
+      </div>
+    </div>`).join('');
+}
+
+async function catAplicar(envioId, boton){
+  const card = document.querySelector(`#cat-respuestas [data-envio="${envioId}"]`);
+  const marcadas = Array.from(card.querySelectorAll('input[data-sec]:checked')).map(i => i.dataset.sec);
+  const total = card.querySelectorAll('input[data-sec]').length;
+  if (total && !marcadas.length) return alert('Marca al menos una sección para aplicar, o rechaza la respuesta.');
+  const msg = total ? `Se aplicarán ${marcadas.length} de ${total} secciones al catastro y a Contactos (los cambios quedan en el historial).` + (marcadas.length < total ? '\nLas secciones sin marcar se descartan.' : '') + '\n\n¿Continuar?' : '¿Marcar como revisada?';
+  if (!confirm(msg)) return;
+  if (!iniciarCarga(boton, 'Aplicando...')) return;
+  try{
+    const r = await api('catastroAplicarRespuesta', { envioId, secciones: marcadas });
+    finCarga(boton);
+    if (r.notas && r.notas.length) alert('Aplicado.\n\n' + r.notas.join('\n'));
+    // Contactos pudo cambiar: se refresca la caché general del sistema
+    try{ cacheContactos = await api('listContactos'); renderContactos(); }catch(e){}
+    await catRecargarDatos();
+  }catch(e){ finCarga(boton); alert(e.message); }
+}
+
+async function catRechazar(envioId, boton){
+  const motivo = prompt('Motivo del rechazo (opcional, queda registrado):', '');
+  if (motivo === null) return;
+  if (!iniciarCarga(boton, 'Rechazando...')) return;
+  try{ await api('catastroRechazarRespuesta', { envioId, motivo }); finCarga(boton); await catRecargarDatos(); }
+  catch(e){ finCarga(boton); alert(e.message); }
+}
+
+// ---------- historial ----------
+async function catCargarHistorial(){
+  try{ catCambios = await api('catastroListCambios', { limite: 400 }); renderCatHistorial(); }catch(e){}
+}
+function renderCatHistorial(){
+  const cont = document.getElementById('cat-historial');
+  const b = (document.getElementById('cat-h-buscar').value || '').toLowerCase().trim();
+  const lista = catCambios.filter(c => !b || `${c.torre}-${c.unidad} ${c.campo} ${c.anterior} ${c.nuevo} ${c.origen}`.toLowerCase().includes(b));
+  if (!lista.length){ cont.innerHTML = '<p class="empty">Aún no hay cambios registrados.</p>'; return; }
+  cont.innerHTML = '<table><tr><th>Fecha</th><th>Unidad</th><th>Qué cambió</th><th>Antes</th><th>Después</th><th>Origen</th></tr>' +
+    lista.map(c => `<tr><td class="mono">${catFecha(c.fecha)}</td><td>${esc(c.torre)} · ${esc(c.unidad)}${c.esPrueba ? ' <span class="badge en_revision">PRUEBA</span>' : ''}</td><td>${esc(c.campo)}</td><td>${esc(c.anterior) || '—'}</td><td>${esc(c.nuevo) || '—'}</td><td>${esc(c.origen)}</td></tr>`).join('') + '</table>';
+}
+
+// ---------- herramientas ----------
+async function catCrearPrueba(boton){
+  const email = document.getElementById('cat-prueba-email').value.trim();
+  if (!email) return alert('Escribe el correo donde quieres recibir la prueba.');
+  if (!iniciarCarga(boton, 'Creando...')) return;
+  try{
+    await api('catastroCrearUnidadPrueba', { email });
+    finCarga(boton);
+    await catRecargarDatos();
+    alert('Unidad de prueba T-999 lista. Aparece primera en "Unidades y envío": selecciónala y envía la solicitud para recibir el correo.');
+  }catch(e){ finCarga(boton); alert(e.message); }
+}
+async function catEliminarPrueba(boton){
+  if (!confirm('¿Eliminar la unidad de prueba con sus envíos y cambios de prueba? No afecta a ninguna unidad real.')) return;
+  if (!iniciarCarga(boton, 'Eliminando...')) return;
+  try{ await api('catastroEliminarUnidadPrueba'); finCarga(boton); catSel.delete('T-999'); await catRecargarDatos(); }
+  catch(e){ finCarga(boton); alert(e.message); }
+}
+
+async function catImportarResidentes(boton){
+  const texto = document.getElementById('cat-import-texto').value;
+  const lineas = texto.split(/\r?\n/).map(l => l.split(/[;\t,]/).map(x => x.trim())).filter(p => p.length >= 3 && p[2])
+    .map(p => ({ torre: p[0], unidad: p[1], nombre: p.slice(2).join(' ') }));
+  if (!lineas.length) return alert('No encontré líneas válidas. El formato es: Torre; Unidad; Nombre completo');
+  if (!confirm(`Se cargarán hasta ${lineas.length} personas como residentes de sus unidades. No se modifica Contactos. ¿Continuar?`)) return;
+  if (!iniciarCarga(boton, 'Cargando...')) return;
+  try{
+    const r = await api('catastroImportarResidentes', { lineas });
+    finCarga(boton);
+    document.getElementById('cat-import-resultado').innerHTML = `${r.agregados} agregadas · ${r.duplicados} ya estaban registradas · ${r.totalSinUnidad} sin unidad reconocida` + (r.sinUnidad.length ? '<br>Sin unidad: ' + r.sinUnidad.map(esc).join(' · ') : '');
+  }catch(e){ finCarga(boton); alert(e.message); }
+}
+
+async function catExportar(boton){
+  if (!iniciarCarga(boton, 'Preparando...')) return;
+  try{
+    const filas = await api('catastroExportar');
+    finCarga(boton);
+    if (!filas.length) return alert('No hay unidades para exportar.');
+    const cols = Object.keys(filas[0]);
+    const celda = v => '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
+    const csv = '\uFEFF' + [cols.map(celda).join(';')].concat(filas.map(f => cols.map(c => celda(f[c])).join(';'))).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'catastro-jdvm-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }catch(e){ finCarga(boton); alert(e.message); }
+}
+
 </script>
 
 <div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;padding:20px;">
@@ -3892,6 +4476,33 @@ function esc(s){
     <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
       <button class="icon-btn" onclick="cerrarModalTexto()">Cerrar</button>
       <button class="btn-primary" onclick="copiarTextoModal(this)">📋 Copiar</button>
+    </div>
+  </div>
+</div>
+
+<div id="cat-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1100;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:10px;padding:20px;max-width:720px;width:100%;max-height:92vh;display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+    <h3 id="cat-modal-titulo" style="font-family:'Fraunces',serif;font-size:1.05rem;"></h3>
+    <div id="cat-modal-meta" style="font-size:0.83rem;color:var(--ink-soft);"></div>
+    <iframe id="cat-modal-frame" sandbox="" title="Vista previa del correo"></iframe>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+      <button class="icon-btn" onclick="catCerrarModal()">Cerrar</button>
+      <button class="icon-btn" onclick="catEnviarPrueba(this)">Enviar prueba a mi correo</button>
+      <button class="btn-primary" id="cat-btn-solo-esta" onclick="catEnviarSoloEsta(this)">Enviar solo a esta unidad</button>
+    </div>
+  </div>
+</div>
+
+<div id="cat-modal-deleg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1100;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:10px;padding:22px;max-width:480px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+    <h3 id="cat-deleg-titulo" style="font-family:'Fraunces',serif;font-size:1.05rem;margin-bottom:8px;"></h3>
+    <p id="cat-deleg-actual" class="empty" style="margin-bottom:12px;"></p>
+    <p class="empty" style="margin-bottom:12px;">Se envía el mismo enlace personal de la unidad, con un correo que explica que el propietario delegó esta gestión. La persona deberá indicar su nombre al responder, y la respuesta pasa igual por tu revisión.</p>
+    <div class="form-row"><label>Correo de la persona</label><input type="email" id="cat-deleg-email" placeholder="persona@correo.cl"></div>
+    <div class="form-row"><label>Nombre (opcional)</label><input type="text" id="cat-deleg-nombre" placeholder="Ej. María González"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="icon-btn" onclick="catCerrarDelegar()">Cancelar</button>
+      <button class="btn-primary" onclick="catEnviarDelegado(this)">Enviar enlace</button>
     </div>
   </div>
 </div>
