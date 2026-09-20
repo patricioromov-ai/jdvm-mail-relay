@@ -588,6 +588,8 @@
           <div class="form-row"><label>Hasta</label><input type="date" id="mud-print-fecha-fin"></div>
         </div>
         <button class="icon-btn" onclick="imprimirMudanzas()">🖨 Imprimir rango</button>
+        <button class="icon-btn" onclick="generarPdfConsolidadoMudanzasBtn()">📄 Generar PDF</button>
+        <button class="icon-btn" onclick="enviarConsolidadoMudanzasWhatsAppBtn()">📱 Enviar por WhatsApp</button>
       </div>
 
       <div class="card" id="card-pendientes-mudanzas" style="display:none;background:#F7E4E4;border-left:4px solid #C1544B;">
@@ -802,70 +804,54 @@
 
     <!-- MENSAJES -->
     <section class="view" id="view-mensajes">
-      <div class="topline"><div><h2>Mensajes de Residentes</h2><p>Consultas recibidas por Edifito u otro canal, categorizadas con respuesta sugerida — ahora en Supabase</p></div></div>
+      <div class="topline"><div><h2>Mensajes de Residentes</h2><p>Consultas recibidas por Edifito u otro canal, categorizadas con respuesta sugerida</p></div></div>
 
-      <div class="card" id="men-login-card" style="display:none;max-width:360px;">
-        <h3 style="margin-top:0;">Iniciar sesión</h3>
-        <p class="empty">Este módulo requiere tu cuenta de administrador (misma cuenta que Reservas).</p>
-        <div class="form-row"><label>Email</label><input type="email" id="men-login-email"></div>
-        <div class="form-row"><label>Contraseña</label><input type="password" id="men-login-pass"></div>
-        <button class="btn-primary" onclick="loginMensajes(this)">Ingresar</button>
-        <span id="men-login-msg" class="tag" style="margin-left:10px;display:none;"></span>
+      <div class="card">
+        <div class="grid-stats" id="men-stats"><p class="empty">Cargando...</p></div>
       </div>
 
-      <div id="men-content" style="display:none;">
-        <div class="card" style="display:flex;justify-content:flex-end;">
-          <button class="icon-btn" onclick="logoutMensajes()">Cerrar sesión</button>
-        </div>
-
-        <div class="card">
-          <div class="grid-stats" id="men-stats"><p class="empty">Cargando...</p></div>
-        </div>
-
-        <div class="card">
-          <h3 id="men-form-titulo">Nuevo mensaje</h3>
-          <input type="hidden" id="men-id">
-          <div class="form-grid">
-            <div class="form-row"><label>Fecha</label><input type="text" id="men-fecha" placeholder="21-08-2026 06:50"></div>
-            <div class="form-row"><label>Canal</label><input type="text" id="men-canal" value="Edifito"></div>
-            <div class="form-row"><label>Remitente</label><input type="text" id="men-remitente"></div>
-            <div class="form-row"><label>Torre</label>
-              <select id="men-torre"><option value="">No especifica</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
-            </div>
-            <div class="form-row"><label>Unidad</label><input type="text" id="men-unidad"></div>
-            <div class="form-row"><label>Asunto</label><input type="text" id="men-asunto"></div>
-            <div class="form-row"><label>Categoría</label><select id="men-categoria"></select></div>
+      <div class="card">
+        <h3 id="men-form-titulo">Nuevo mensaje</h3>
+        <input type="hidden" id="men-id">
+        <div class="form-grid">
+          <div class="form-row"><label>Fecha</label><input type="text" id="men-fecha" placeholder="21-08-2026 06:50"></div>
+          <div class="form-row"><label>Canal</label><input type="text" id="men-canal" value="Edifito"></div>
+          <div class="form-row"><label>Remitente</label><input type="text" id="men-remitente"></div>
+          <div class="form-row"><label>Torre</label>
+            <select id="men-torre"><option value="">No especifica</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
           </div>
-          <div class="form-row"><label>Mensaje</label><textarea id="men-mensaje"></textarea></div>
-          <button class="btn-primary" onclick="guardarMensaje(this)">Guardar mensaje</button>
-          <button class="icon-btn" onclick="cancelarEdicionMensaje()">Cancelar</button>
-          <button class="icon-btn" onclick="document.getElementById('men-csv-input').click()">＋ Importar planilla (CSV)</button>
-          <input type="file" id="men-csv-input" accept=".csv" style="display:none;" onchange="importarMensajesCSV(event)">
-          <p class="empty" style="margin-top:8px;">El CSV debe tener columnas: <span class="mono">fecha,canal,remitente,torre,unidad,asunto,mensaje</span> (encabezados en la primera fila). Los mensajes importados por CSV se categorizan automáticamente por palabras clave (igual que antes) — revisa y reclasifica desde la tabla los que caigan en "Otro".</p>
+          <div class="form-row"><label>Unidad</label><input type="text" id="men-unidad"></div>
+          <div class="form-row"><label>Asunto</label><input type="text" id="men-asunto"></div>
         </div>
+        <div class="form-row"><label>Mensaje</label><textarea id="men-mensaje"></textarea></div>
+        <button class="btn-primary" onclick="guardarMensaje(this)">Guardar mensaje</button>
+        <button class="icon-btn" onclick="cancelarEdicionMensaje()">Cancelar</button>
+        <button class="icon-btn" onclick="document.getElementById('men-csv-input').click()">＋ Importar planilla (CSV)</button>
+        <input type="file" id="men-csv-input" accept=".csv" style="display:none;" onchange="importarMensajesCSV(event)">
+        <p class="empty" style="margin-top:8px;">El CSV debe tener columnas: <span class="mono">fecha,canal,remitente,torre,unidad,asunto,mensaje</span> (encabezados en la primera fila).</p>
+      </div>
 
-        <div class="card">
-          <div class="form-grid">
-            <div class="form-row"><label>Filtrar por categoría</label>
-              <select id="men-filtro-categoria" onchange="renderMensajes()"><option value="">Todas</option></select>
-            </div>
-            <div class="form-row"><label>Filtrar por estado</label>
-              <select id="men-filtro-estado" onchange="renderMensajes()">
-                <option value="">Todos</option><option value="nuevo">Nuevo</option><option value="en_revision">En revisión</option><option value="respondido">Respondido</option>
-              </select>
-            </div>
+      <div class="card">
+        <div class="form-grid">
+          <div class="form-row"><label>Filtrar por categoría</label>
+            <select id="men-filtro-categoria" onchange="renderMensajes()"><option value="">Todas</option></select>
+          </div>
+          <div class="form-row"><label>Filtrar por estado</label>
+            <select id="men-filtro-estado" onchange="renderMensajes()">
+              <option value="">Todos</option><option value="nuevo">Nuevo</option><option value="en_revision">En revisión</option><option value="respondido">Respondido</option>
+            </select>
           </div>
         </div>
+      </div>
 
-        <div class="card">
-          <h3>Mensajes</h3>
-          <div id="tabla-mensajes"><p class="empty">Cargando...</p></div>
-        </div>
+      <div class="card">
+        <h3>Mensajes</h3>
+        <div id="tabla-mensajes"><p class="empty">Cargando...</p></div>
+      </div>
 
-        <div class="card">
-          <h3>Respuestas tipo por categoría</h3>
-          <div id="tabla-respuestas-tipo"><p class="empty">Cargando...</p></div>
-        </div>
+      <div class="card">
+        <h3>Respuestas tipo por categoría</h3>
+        <div id="tabla-respuestas-tipo"><p class="empty">Cargando...</p></div>
       </div>
     </section>
 
@@ -1012,12 +998,12 @@ function toggleForm(id){
 // ========= CARGA INICIAL =========
 async function cargarTodo(){
   try{
-    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheMudanzas, cacheTarjetas, cachePersonalEquipos, cacheHistorialCambios, cacheAnomaliasAceptadas, cacheFormularios, cacheEnlacesMudanza] = await Promise.all([
-      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listMudanzas'), api('listTarjetas'), api('listPersonalEquipos'), api('listHistorialCambiosContactos'), api('listAnomaliasAceptadas'), api('listFormularios'), api('listEnlacesMudanza')
+    [cacheContactos, cacheExternos, cachePlantillas, cacheCampanas, cacheLogs, cacheConfig, cacheEncuestas, cacheMudanzas, cacheTarjetas, cachePersonalEquipos, cacheMensajes, cacheRespuestasTipo, cacheHistorialCambios, cacheAnomaliasAceptadas, cacheFormularios, cacheEnlacesMudanza] = await Promise.all([
+      api('listContactos'), api('listContactosExternos'), api('listPlantillas'), api('listCampanas'), api('listLogs'), api('getConfig'), api('listEncuestas'), api('listMudanzas'), api('listTarjetas'), api('listPersonalEquipos'), api('listMensajes'), api('listRespuestasTipo'), api('listHistorialCambiosContactos'), api('listAnomaliasAceptadas'), api('listFormularios'), api('listEnlacesMudanza')
     ]);
     renderPanel(); renderContactos(); renderExternos(); renderPlantillas();
-    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderMudanzas(); renderTarjetas(); renderPersonalEquipos(); renderAnomalias(); renderFormularios(); renderCamposExtraLista(); renderEnlacesMudanza();
-    // Reservas y Mensajes ahora viven en Supabase y se cargan/renderizan por su propio flujo de login, ver initSupabaseAuth().
+    renderCampanas(); renderSelectPlantillas(); renderSelectEncuestas(); renderSeguimiento(); renderConfig(); renderMudanzas(); renderTarjetas(); renderPersonalEquipos(); renderMensajes(); renderRespuestasTipo(); renderAnomalias(); renderFormularios(); renderCamposExtraLista(); renderEnlacesMudanza();
+    // Reservas ahora vive en Supabase y se carga/renderiza por su propio flujo de login, ver initSupabaseAuth().
   }catch(e){ /* el error ya se muestra en el banner */ }
 }
 cargarTodo();
@@ -2142,11 +2128,9 @@ async function initSupabaseAuth(){
   const { data: { session } } = await supabaseClient.auth.getSession();
   sesionSupabase = session;
   actualizarUIReservasAuth();
-  actualizarUIMensajesAuth();
   supabaseClient.auth.onAuthStateChange((_event, session) => {
     sesionSupabase = session;
     actualizarUIReservasAuth();
-    actualizarUIMensajesAuth();
   });
 }
 function actualizarUIReservasAuth(){
@@ -2791,6 +2775,30 @@ function renderMudanzas(){
   if (historial && historial.style.display !== 'none') renderHistorialMudanzas();
 }
 
+function validarRangoFechasMudanzas(){
+  const desde = document.getElementById('mud-print-fecha-inicio').value;
+  const hasta = document.getElementById('mud-print-fecha-fin').value;
+  if (!desde || !hasta){ alert('Selecciona fecha de inicio y de término.'); return null; }
+  if (hasta < desde){ alert('La fecha de término debe ser igual o posterior a la de inicio.'); return null; }
+  return { desde, hasta };
+}
+async function generarPdfConsolidadoMudanzasBtn(){
+  const rango = validarRangoFechasMudanzas();
+  if (!rango) return;
+  try{
+    const r = await api('generarPdfConsolidadoMudanzas', rango);
+    window.open(r.url, '_blank');
+  }catch(e){}
+}
+async function enviarConsolidadoMudanzasWhatsAppBtn(){
+  const rango = validarRangoFechasMudanzas();
+  if (!rango) return;
+  try{
+    const r = await api('generarPdfConsolidadoMudanzas', rango);
+    const mensaje = `Consolidado de Mudanzas (${rango.desde} al ${rango.hasta}) — ${r.total} mudanza(s):\n${r.url}`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank');
+  }catch(e){}
+}
 function imprimirMudanzas(){
   const desde = document.getElementById('mud-print-fecha-inicio').value;
   const hasta = document.getElementById('mud-print-fecha-fin').value;
@@ -3237,156 +3245,7 @@ function renderPersonalEquipos(){
     <button class="icon-btn" onclick="eliminarPersonalEquipo(${p.id})">Eliminar</button></td></tr>`).join('') + '</table>';
 }
 
-// ========= MENSAJES DE RESIDENTES (Supabase) =========
-let cacheCategoriasMensajes = []; // [{id, nombre}], cargado desde la tabla categorias
-
-function actualizarUIMensajesAuth(){
-  const login = document.getElementById('men-login-card');
-  const content = document.getElementById('men-content');
-  if (!login || !content) return;
-  if (sesionSupabase){
-    login.style.display = 'none';
-    content.style.display = 'block';
-    cargarMensajesSupabase().then(()=>{ renderSelectCategoriaFormMensaje(); renderMensajes(); renderRespuestasTipo(); });
-  } else {
-    login.style.display = 'block';
-    content.style.display = 'none';
-  }
-}
-async function loginMensajes(boton){
-  if (!iniciarCarga(boton, 'Ingresando...')) return;
-  const email = document.getElementById('men-login-email').value;
-  const pass = document.getElementById('men-login-pass').value;
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
-  finCarga(boton);
-  const msg = document.getElementById('men-login-msg');
-  if (error){ msg.style.display = 'inline-block'; msg.textContent = '✗ ' + error.message; }
-  else { msg.style.display = 'none'; }
-}
-async function logoutMensajes(){
-  await supabaseClient.auth.signOut();
-}
-
-// --- Conversión hora de Chile <-> UTC real, sin librerías externas ---
-// Usa Intl con timeZone America/Santiago, así que respeta cualquier cambio
-// de horario histórico (no asume un offset fijo tipo '-04:00').
-function zonedWallTimeToUtcISO(y, mo, d, h, mi, timeZone){
-  const asUTCGuess = new Date(Date.UTC(y, mo-1, d, h, mi, 0));
-  const dtf = new Intl.DateTimeFormat('en-US', { timeZone, hour12:false,
-    year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
-  const p = Object.fromEntries(dtf.formatToParts(asUTCGuess).map(x=>[x.type,x.value]));
-  const comoSiFueraUTC = Date.UTC(+p.year, +p.month-1, +p.day, p.hour==='24'?0:+p.hour, +p.minute, +p.second);
-  const offsetMs = comoSiFueraUTC - asUTCGuess.getTime();
-  return new Date(asUTCGuess.getTime() - offsetMs).toISOString();
-}
-// Acepta 'dd-mm-yyyy' o 'dd-mm-yyyy hh:mm' (hora de Chile, tal como se escribe en el formulario)
-function parsearFechaMensaje(texto){
-  const t = (texto||'').trim();
-  let m = t.match(/^(\d{2})-(\d{2})-(\d{4})[ T](\d{1,2}):(\d{2})$/);
-  if (m){
-    const [, d, mo, y, h, mi] = m;
-    return { iso: zonedWallTimeToUtcISO(+y, +mo, +d, +h, +mi, 'America/Santiago'), soloDia: false };
-  }
-  m = t.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-  if (m){
-    const [, d, mo, y] = m;
-    return { iso: zonedWallTimeToUtcISO(+y, +mo, +d, 0, 0, 'America/Santiago'), soloDia: true };
-  }
-  throw new Error('Fecha inválida. Usa dd-mm-yyyy o dd-mm-yyyy hh:mm, ej: 21-08-2026 06:50');
-}
-// Reconstruye dd-mm-yyyy hh:mm (hora de Chile) a partir del timestamptz que devuelve Supabase
-function formatearFechaChile(isoUTC, soloDia){
-  const dtf = new Intl.DateTimeFormat('en-GB', { timeZone:'America/Santiago', hour12:false,
-    year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
-  const p = Object.fromEntries(dtf.formatToParts(new Date(isoUTC)).map(x=>[x.type,x.value]));
-  return soloDia ? `${p.day}-${p.month}-${p.year}` : `${p.day}-${p.month}-${p.year} ${p.hour}:${p.minute}`;
-}
-
-// Portado 1:1 desde Apps Script (categorizarMensaje_ / CATEGORIAS_MENSAJES_).
-// El orden importa: se revisa de arriba hacia abajo y se queda con la primera coincidencia.
-const CATEGORIAS_MENSAJES_JS = {
-  'Multas': ['multa', 'infracción', 'infraccion', 'utm'],
-  'Documentos/Certificados': ['certificado', 'certificad'],
-  'Tarjeta de Acceso': ['tarjeta de acceso', 'tarjeta', 'extravío', 'extravio'],
-  'Acceso App/Edifito': ['acceso a la app', 'edifito', 'aplicacion', 'aplicación', 'usuario app', 'clave app'],
-  'Estacionamiento': ['estacionamiento', 'auto de mi propiedad', 'vehículo', 'vehiculo'],
-  'Mascotas/Convivencia': ['mascota', 'perro', 'gato', 'fecas', 'caca', 'ladra'],
-  'Ruidos/Disturbios': ['ruido', 'alcohol', 'droga', 'ebrio', 'indigente', 'disturbio', 'ordinario', 'molest', 'escandal'],
-  'Mantención/Fallas': ['filtración', 'filtracion', 'fuga', 'falla', 'no funciona', 'gotera', 'ascensor'],
-  'Reservas Áreas Comunes': ['reserva', 'gimnasio', 'quincho', 'salón', 'salon', 'piscina'],
-  'Gastos Comunes/Pagos': ['gasto común', 'gasto comun', 'ggcc', 'gastos comunes', 'deuda', 'transferencia', 'comprobante de pago', 'abono', 'cobranza', 'khipu', 'pagué', 'pague'],
-};
-function categorizarMensaje(texto){
-  const t = (texto || '').toLowerCase();
-  for (const categoria in CATEGORIAS_MENSAJES_JS){
-    if (CATEGORIAS_MENSAJES_JS[categoria].some(palabra => t.indexOf(palabra) !== -1)) return categoria;
-  }
-  return 'Otro';
-}
-function idCategoriaPorNombre(nombre){
-  const c = cacheCategoriasMensajes.find(x=>x.nombre===nombre);
-  return c ? c.id : null;
-}
-
-async function cargarMensajesSupabase(){
-  const { data: categorias, error: e0 } = await supabaseClient
-    .from('categorias').select('id, nombre').order('nombre');
-  if (e0){ mostrarErrorGlobal('Error cargando categorías: ' + e0.message); return; }
-  cacheCategoriasMensajes = categorias || [];
-
-  const { data: mensajes, error: e1 } = await supabaseClient
-    .from('mensajes')
-    .select('id, fecha, fecha_solo_dia, canal, remitente, torre, unidad, asunto, mensaje, estado, notas, categoria_id, categorias(nombre)')
-    .order('fecha', { ascending: false });
-  if (e1){ mostrarErrorGlobal('Error cargando mensajes: ' + e1.message); return; }
-  cacheMensajes = (mensajes || []).map(m => ({
-    id: m.id,
-    fecha: formatearFechaChile(m.fecha, m.fecha_solo_dia),
-    fechaISO: m.fecha,
-    fechaSoloDia: m.fecha_solo_dia,
-    canal: m.canal, remitente: m.remitente, torre: m.torre, unidad: m.unidad,
-    asunto: m.asunto, mensaje: m.mensaje,
-    categoria_id: m.categoria_id,
-    categoria: m.categorias ? m.categorias.nombre : '(categoría eliminada)',
-    estado: m.estado, notas: m.notas
-  }));
-
-  const { data: respuestas, error: e2 } = await supabaseClient
-    .from('respuestas_tipo')
-    .select('id, respuesta, categoria_id, categorias(nombre)')
-    .order('id');
-  if (e2){ mostrarErrorGlobal('Error cargando respuestas tipo: ' + e2.message); return; }
-  cacheRespuestasTipo = (respuestas || []).map(r => ({
-    id: r.id, respuesta: r.respuesta, categoria_id: r.categoria_id,
-    categoria: r.categorias ? r.categorias.nombre : '(categoría eliminada)'
-  }));
-}
-
-let categoriaTocadaManualmente = false; // se resetea al limpiar el formulario
-function renderSelectCategoriaFormMensaje(){
-  const sel = document.getElementById('men-categoria');
-  if (!sel) return;
-  const actual = sel.value;
-  sel.innerHTML = cacheCategoriasMensajes.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
-  if (actual && cacheCategoriasMensajes.some(c=>String(c.id)===actual)) sel.value = actual;
-}
-function sugerirCategoriaEnVivo(){
-  if (categoriaTocadaManualmente) return; // el admin ya eligió una a mano, no se le pisa
-  const asunto = document.getElementById('men-asunto').value;
-  const mensaje = document.getElementById('men-mensaje').value;
-  const sugerida = categorizarMensaje(asunto + ' ' + mensaje);
-  const id = idCategoriaPorNombre(sugerida);
-  if (id) document.getElementById('men-categoria').value = id;
-}
-document.addEventListener('DOMContentLoaded', () => {
-  ['men-asunto','men-mensaje'].forEach(campoId => {
-    const el = document.getElementById(campoId);
-    if (el) el.addEventListener('input', sugerirCategoriaEnVivo);
-  });
-  const selCategoria = document.getElementById('men-categoria');
-  if (selCategoria) selCategoria.addEventListener('change', () => { categoriaTocadaManualmente = true; });
-});
-
+// ========= MENSAJES DE RESIDENTES =========
 function limpiarFormularioMensaje(){
   document.getElementById('men-id').value = '';
   document.getElementById('men-fecha').value = '';
@@ -3396,8 +3255,6 @@ function limpiarFormularioMensaje(){
   document.getElementById('men-unidad').value = '';
   document.getElementById('men-asunto').value = '';
   document.getElementById('men-mensaje').value = '';
-  categoriaTocadaManualmente = false;
-  renderSelectCategoriaFormMensaje();
   document.getElementById('men-form-titulo').textContent = 'Nuevo mensaje';
 }
 function cancelarEdicionMensaje(){ limpiarFormularioMensaje(); }
@@ -3409,56 +3266,40 @@ function editarMensaje(id){
   document.getElementById('men-canal').value = m.canal;
   document.getElementById('men-remitente').value = m.remitente;
   document.getElementById('men-torre').value = m.torre || '';
-  document.getElementById('men-unidad').value = m.unidad || '';
+  document.getElementById('men-unidad').value = m.unidad;
   document.getElementById('men-asunto').value = m.asunto;
   document.getElementById('men-mensaje').value = m.mensaje;
-  renderSelectCategoriaFormMensaje();
-  document.getElementById('men-categoria').value = m.categoria_id;
-  categoriaTocadaManualmente = true;
   document.getElementById('men-form-titulo').textContent = 'Editar mensaje';
-  document.querySelector('#men-content .card:nth-child(2)').scrollIntoView({behavior:'smooth'});
+  document.querySelector('#view-mensajes .card:nth-child(2)').scrollIntoView({behavior:'smooth'});
 }
 async function guardarMensaje(boton){
   if (!iniciarCarga(boton)) return;
   const id = document.getElementById('men-id').value;
-  let fechaParsed;
-  try{ fechaParsed = parsearFechaMensaje(document.getElementById('men-fecha').value); }
-  catch(e){ finCarga(boton); return alert(e.message); }
   const payload = {
-    fecha: fechaParsed.iso,
-    fecha_solo_dia: fechaParsed.soloDia,
+    fecha: document.getElementById('men-fecha').value,
     canal: document.getElementById('men-canal').value,
     remitente: document.getElementById('men-remitente').value,
-    torre: document.getElementById('men-torre').value || null,
-    unidad: document.getElementById('men-unidad').value || null,
+    torre: document.getElementById('men-torre').value,
+    unidad: document.getElementById('men-unidad').value,
     asunto: document.getElementById('men-asunto').value,
     mensaje: document.getElementById('men-mensaje').value,
-    categoria_id: +document.getElementById('men-categoria').value,
   };
   if (!payload.mensaje){ finCarga(boton); return alert('Escribe el mensaje.'); }
-  if (!payload.remitente){ finCarga(boton); return alert('Escribe el remitente.'); }
   try{
-    let error;
-    if (id){ ({ error } = await supabaseClient.from('mensajes').update(payload).eq('id', id)); }
-    else { ({ error } = await supabaseClient.from('mensajes').insert(payload)); }
-    if (error){ mostrarErrorGlobal('Error guardando mensaje: ' + error.message); return; }
+    if (id){ payload.id = id; await api('updateMensaje', payload); }
+    else { await api('addMensaje', payload); }
     limpiarFormularioMensaje();
-    await cargarMensajesSupabase();
-    renderMensajes(); renderRespuestasTipo();
+    await cargarTodo();
   } finally { finCarga(boton, '✔ Guardado'); }
 }
 async function eliminarMensaje(id){
   if (!confirm('¿Eliminar este mensaje?')) return;
-  const { error } = await supabaseClient.from('mensajes').delete().eq('id', id);
-  if (error){ mostrarErrorGlobal('Error eliminando mensaje: ' + error.message); return; }
-  await cargarMensajesSupabase();
-  renderMensajes(); renderRespuestasTipo();
+  await api('deleteMensaje', { id });
+  await cargarTodo();
 }
 async function cambiarEstadoMensaje(id, estado){
-  const { error } = await supabaseClient.from('mensajes').update({ estado }).eq('id', id);
-  if (error){ mostrarErrorGlobal('Error cambiando estado: ' + error.message); return; }
-  await cargarMensajesSupabase();
-  renderMensajes();
+  await api('updateMensaje', { id, estado });
+  await cargarTodo();
 }
 function abrirModalTexto(titulo, texto){
   document.getElementById('modal-titulo').textContent = titulo;
@@ -3486,40 +3327,22 @@ function verRespuestaSugerida(id){
   const texto = r ? r.respuesta : 'Sin respuesta tipo configurada para esta categoría.';
   abrirModalTexto('Respuesta sugerida (' + m.categoria + ')', texto);
 }
-// Categorización automática por palabras clave, portada 1:1 desde Apps Script
-// (ver CATEGORIAS_MENSAJES_JS / categorizarMensaje arriba).
 async function importarMensajesCSV(evento){
   const file = evento.target.files[0];
   if (!file) return;
   const texto = await file.text();
   const filas = parseCSV(texto);
-  const categoriaOtro = cacheCategoriasMensajes.find(c=>c.nombre==='Otro');
-  if (!categoriaOtro){ evento.target.value = ''; return alert('No se encontró la categoría "Otro" en Supabase.'); }
-  const mensajes = [];
-  const filasInvalidas = [];
-  filas.forEach((f, i) => {
-    if (!f.mensaje) return;
-    let fechaParsed;
-    try{ fechaParsed = parsearFechaMensaje(f.fecha || ''); }
-    catch(e){ filasInvalidas.push(i+2); return; }
-    const nombreCategoria = categorizarMensaje((f.asunto || '') + ' ' + f.mensaje);
-    mensajes.push({
-      fecha: fechaParsed.iso, fecha_solo_dia: fechaParsed.soloDia,
-      canal: f.canal || 'Edifito', remitente: f.remitente || '',
-      torre: (f.torre||'').toUpperCase() || null, unidad: f.unidad || null,
-      asunto: f.asunto || '', mensaje: f.mensaje,
-      categoria_id: idCategoriaPorNombre(nombreCategoria) || categoriaOtro.id, estado: 'nuevo'
-    });
-  });
-  if (!mensajes.length) return alert('No se encontraron filas válidas (falta columna "mensaje" o la fecha no tiene un formato reconocido).');
-  let confirmMsg = `Se importarán ${mensajes.length} mensajes, categorizados automáticamente por palabras clave (igual que antes). ¿Continuar?`;
-  if (filasInvalidas.length) confirmMsg += `\n(${filasInvalidas.length} filas se omiten por fecha inválida: filas ${filasInvalidas.join(', ')})`;
-  if (!confirm(confirmMsg)) return;
-  const { error } = await supabaseClient.from('mensajes').insert(mensajes);
-  if (error){ mostrarErrorGlobal('Error importando CSV: ' + error.message); }
-  else { alert(`✔ Importados: ${mensajes.length}`); }
-  await cargarMensajesSupabase();
-  renderMensajes(); renderRespuestasTipo();
+  const mensajes = filas.map(f => ({
+    fecha: f.fecha || '', canal: f.canal || 'Edifito', remitente: f.remitente || '',
+    torre: (f.torre||'').toUpperCase(), unidad: f.unidad || '', asunto: f.asunto || '', mensaje: f.mensaje || ''
+  })).filter(m => m.mensaje);
+  if (!mensajes.length) return alert('No se encontraron filas válidas (falta columna "mensaje").');
+  if (!confirm(`Se importarán ${mensajes.length} mensajes. ¿Continuar?`)) return;
+  try{
+    const r = await api('addMensajesBulk', { mensajes });
+    alert(`✔ Importados: ${r.agregados} de ${r.total}`);
+    await cargarTodo();
+  }catch(e){}
   evento.target.value = '';
 }
 function renderSelectCategoriasMensajes(){
@@ -3548,7 +3371,7 @@ function renderMensajes(){
   let lista = [...cacheMensajes];
   if (filtroCategoria) lista = lista.filter(m=>m.categoria===filtroCategoria);
   if (filtroEstado) lista = lista.filter(m=>m.estado===filtroEstado);
-  lista.sort((a,b)=> (b.fechaISO||'').localeCompare(a.fechaISO||''));
+  lista.sort((a,b)=> aValorOrdenable(b.fecha).localeCompare(aValorOrdenable(a.fecha)));
 
   if (!lista.length){ cont.innerHTML = '<p class="empty">Sin mensajes que coincidan.</p>'; return; }
 
@@ -3573,13 +3396,10 @@ function renderMensajes(){
     </tr>`).join('') + '</table>';
 }
 
-// ========= RESPUESTAS TIPO (Supabase) =========
+// ========= RESPUESTAS TIPO =========
 async function guardarRespuestaTipoInline(id, textarea){
   const respuesta = textarea.value;
-  const { error } = await supabaseClient.from('respuestas_tipo').update({ respuesta }).eq('id', id);
-  if (error){ mostrarErrorGlobal('Error guardando respuesta tipo: ' + error.message); return; }
-  const r = cacheRespuestasTipo.find(x=>String(x.id)===String(id));
-  if (r) r.respuesta = respuesta;
+  await api('updateRespuestaTipo', { id, respuesta });
   const tag = textarea.parentElement.querySelector('.tag');
   if (tag){ tag.style.display='inline-block'; setTimeout(()=>tag.style.display='none', 1500); }
 }
