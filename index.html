@@ -483,12 +483,13 @@
           <h3>Ver disponibilidad</h3>
           <div class="form-grid">
             <div class="form-row"><label>Espacio</label>
-              <select id="res-filtro-espacio" onchange="renderReservas()">
+              <select id="res-filtro-espacio" onchange="renderReservas(); renderDisponibilidadVisual();">
                 <option value="">Todos</option>
               </select>
             </div>
-            <div class="form-row"><label>Desde fecha</label><input type="date" id="res-filtro-fecha" onchange="renderReservas()"></div>
+            <div class="form-row"><label>Desde fecha</label><input type="date" id="res-filtro-fecha" onchange="renderReservas(); renderDisponibilidadVisual();"></div>
           </div>
+          <div id="disponibilidad-visual" style="margin-top:14px;"></div>
         </div>
 
         <div class="card">
@@ -498,6 +499,23 @@
             <div class="form-row"><label>Hasta</label><input type="date" id="print-fecha-fin"></div>
           </div>
           <button class="icon-btn" onclick="imprimirReservas()">🖨 Imprimir rango</button>
+          <button class="icon-btn" onclick="generarPdfReservasBtn(this)">📄 Generar PDF</button>
+          <div id="reservas-pdf-resultado" style="display:none;margin-top:12px;padding:12px;background:#EAEAE4;border:1px solid #D8D8D0;border-radius:8px;">
+            <p style="margin:0 0 10px;font-size:0.85rem;">PDF generado: <a id="reservas-pdf-link" href="#" target="_blank">Ver / descargar</a></p>
+            <div class="form-grid">
+              <div class="form-row"><label>Enviar a (contacto)</label>
+                <select id="reservas-pdf-contacto" onchange="document.getElementById('reservas-pdf-numero-row').style.display = this.value==='otro' ? 'block':'none';">
+                  <option value="">Selecciona un contacto</option>
+                  <option value="otro">Otro número...</option>
+                </select>
+              </div>
+              <div class="form-row" id="reservas-pdf-numero-row" style="display:none;">
+                <label>Número (con código de país, sin +, ej. 56912345678)</label>
+                <input type="text" id="reservas-pdf-numero" placeholder="56912345678">
+              </div>
+            </div>
+            <button class="icon-btn" onclick="enviarReservasPorWhatsapp()">📱 Enviar por WhatsApp</button>
+          </div>
         </div>
 
         <div class="card">
@@ -588,8 +606,6 @@
           <div class="form-row"><label>Hasta</label><input type="date" id="mud-print-fecha-fin"></div>
         </div>
         <button class="icon-btn" onclick="imprimirMudanzas()">🖨 Imprimir rango</button>
-        <button class="icon-btn" onclick="generarPdfConsolidadoMudanzasBtn()">📄 Generar PDF</button>
-        <button class="icon-btn" onclick="enviarConsolidadoMudanzasWhatsAppBtn()">📱 Enviar por WhatsApp</button>
       </div>
 
       <div class="card" id="card-pendientes-mudanzas" style="display:none;background:#F7E4E4;border-left:4px solid #C1544B;">
@@ -1695,7 +1711,10 @@ function renderConfig(){
   }
   document.getElementById('cfg-festivos').value = cacheConfig.festivosMudanza || '';
   document.getElementById('cfg-espacios').value = cacheConfig.espaciosReservables || ESPACIOS_POR_DEFECTO.join('\n');
-  renderSelectsEspacios();
+  // Nota: renderSelectsEspacios() ya NO se llama aquí — el módulo Reservas ahora
+  // usa la tabla `espacios` de Supabase (ver renderSelectEspaciosReservas), no
+  // este campo de texto. Este campo de Configuración queda solo como referencia
+  // histórica y no afecta a Reservas.
 }
 async function guardarConfig(boton){
   if (!iniciarCarga(boton)) return;
@@ -2205,11 +2224,101 @@ function renderSelectEspaciosReservas(){
   if (cacheEspacios.some(e=>String(e.id)===valorActualFiltro)) selFiltro.value = valorActualFiltro;
 }
 
+function minutosAHora_(min){
+  min = ((min % 1440) + 1440) % 1440;
+  const h = Math.floor(min/60), m = min%60;
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+function horaAMinutos_(hhmm){
+  const [h,m] = String(hhmm).split(':').map(Number);
+  return h*60 + (m||0);
+}
+function diaAnteriorStr_(fechaStr){
+  const d = new Date(fechaStr + 'T00:00:00');
+  d.setDate(d.getDate()-1);
+  return d.toISOString().slice(0,10);
+}
+function renderDisponibilidadVisual(){
+  const cont = document.getElementById('disponibilidad-visual');
+  if (!cont) return;
+  const espacioId = document.getElementById('res-filtro-espacio')?.value || '';
+  const fecha = document.getElementById('res-filtro-fecha')?.value || '';
+
+  if (!espacioId || !fecha){
+    cont.innerHTML = '<p class="empty">Elige un espacio específico y una fecha para ver el horario libre/ocupado de ese día.</p>';
+    return;
+  }
+  const espacio = cacheEspacios.find(e => String(e.id) === espacioId);
+  const fechaAnterior = diaAnteriorStr_(fecha);
+
+  // reservas relevantes: las de este día, más las de ayer que cruzan medianoche hacia este día
+  const relevantes = cacheReservas.filter(r => String(r.espacio_id) === espacioId && r.estado !== 'cancelada' && (r.fecha === fecha || r.fecha === fechaAnterior));
+
+  const bloques = [];
+  relevantes.forEach(r => {
+    const inicio = horaAMinutos_(r.horaInicio);
+    const fin = horaAMinutos_(r.horaTermino);
+    const cruzaMedianoche = fin <= inicio;
+    if (r.fecha === fecha){
+      bloques.push({ inicio: inicio, fin: cruzaMedianoche ? 1440 : fin, r: r, continua: cruzaMedianoche });
+    } else if (cruzaMedianoche){
+      // reserva de ayer que se extiende hasta la madrugada de hoy
+      bloques.push({ inicio: 0, fin: fin, r: r, vieneDeAyer: true });
+    }
+  });
+  bloques.sort((a,b)=>a.inicio-b.inicio);
+
+  // huecos libres entre los bloques ocupados
+  let cursor = 0;
+  const huecos = [];
+  bloques.forEach(b => {
+    if (b.inicio > cursor) huecos.push({ inicio: cursor, fin: b.inicio });
+    cursor = Math.max(cursor, b.fin);
+  });
+  if (cursor < 1440) huecos.push({ inicio: cursor, fin: 1440 });
+
+  const segmentos = [];
+  bloques.forEach(b => segmentos.push({ tipo: 'ocupado', inicio: b.inicio, fin: b.fin, b: b }));
+  huecos.forEach(h => segmentos.push({ tipo: 'libre', inicio: h.inicio, fin: h.fin }));
+  segmentos.sort((a,b)=>a.inicio-b.inicio);
+
+  const barra = segmentos.map(s => {
+    const ancho = ((s.fin - s.inicio) / 1440 * 100).toFixed(2);
+    if (s.tipo === 'ocupado'){
+      const r = s.b.r;
+      const etiqueta = (s.b.vieneDeAyer ? '(viene de ayer) ' : '') + esc(r.horaInicio) + '–' + esc(r.horaTermino) + (s.b.continua ? ' (sigue mañana)' : '') + ' · ' + esc(r.nombreSolicitante);
+      return `<div style="width:${ancho}%;background:#F7E4E4;border-right:1px solid #fff;padding:4px 2px;font-size:0.68rem;color:#C1544B;overflow:hidden;white-space:nowrap;" title="${etiqueta}">${etiqueta}</div>`;
+    }
+    const duracion = s.fin - s.inicio;
+    if (duracion < 15) return `<div style="width:${ancho}%;background:#E4EEE9;border-right:1px solid #fff;"></div>`;
+    return `<div style="width:${ancho}%;background:#E4EEE9;border-right:1px solid #fff;cursor:pointer;padding:4px 2px;font-size:0.68rem;color:#3F7D6B;overflow:hidden;white-space:nowrap;" title="Libre ${minutosAHora_(s.inicio)}–${minutosAHora_(s.fin)} — clic para agendar" onclick="agendarEnHueco_('${espacioId}','${fecha}',${s.inicio},${s.fin})">Libre ${minutosAHora_(s.inicio)}–${minutosAHora_(s.fin)}</div>`;
+  }).join('');
+
+  const marcasHora = [0,6,12,18,24].map(h => `<span style="flex:1;text-align:${h===0?'left':h===24?'right':'center'};">${String(h).padStart(2,'0')}:00</span>`).join('');
+
+  cont.innerHTML = `
+    <p style="font-size:0.85rem;color:#4A5568;margin-bottom:6px;">Disponibilidad de <b>${esc(espacio ? espacio.nombre : '')}</b> el ${formatearFechaSolo(fecha)}. Haz clic en un tramo libre (verde) para agendarlo directamente.</p>
+    <div style="display:flex;width:100%;height:34px;border:1px solid #D8D8D0;border-radius:6px;overflow:hidden;">${barra}</div>
+    <div style="display:flex;font-size:0.7rem;color:#8A8A80;margin-top:2px;">${marcasHora}</div>
+  `;
+}
+function agendarEnHueco_(espacioId, fecha, inicioMin, finMin){
+  limpiarFormularioReserva();
+  document.getElementById('res-espacio').value = espacioId;
+  document.getElementById('res-fecha').value = fecha;
+  document.getElementById('res-hora-inicio').value = minutosAHora_(inicioMin);
+  // si el hueco llega hasta el final del día (1440), se deja el término en blanco
+  // para que el admin decida hasta qué hora exacta (podría cruzar medianoche)
+  document.getElementById('res-hora-termino').value = finMin < 1440 ? minutosAHora_(finMin) : '';
+  document.getElementById('res-form-titulo').textContent = 'Nueva reserva';
+  document.querySelector('#reservas-content .card').scrollIntoView({behavior:'smooth'});
+}
 function renderReservas(){
   const cont = document.getElementById('tabla-reservas');
   if (!cont) return;
   const filtroEspacio = document.getElementById('res-filtro-espacio')?.value || '';
   const filtroFecha = document.getElementById('res-filtro-fecha')?.value || '';
+  renderDisponibilidadVisual();
 
   let lista = cacheReservas.filter(r => r.estado !== 'cancelada' && r.estado !== 'realizada');
   if (filtroEspacio) lista = lista.filter(r => String(r.espacio_id) === filtroEspacio);
@@ -2409,6 +2518,50 @@ function imprimirReservas(){
   ventana.document.write(html);
   ventana.document.close();
   ventana.onload = () => ventana.print();
+}
+
+let ultimoPdfReservasUrl = '';
+async function generarPdfReservasBtn(boton){
+  const desde = document.getElementById('print-fecha-inicio').value;
+  const hasta = document.getElementById('print-fecha-fin').value;
+  if (!desde || !hasta) return alert('Selecciona fecha de inicio y de término.');
+  if (hasta < desde) return alert('La fecha de término debe ser igual o posterior a la de inicio.');
+  if (!iniciarCarga(boton, 'Generando PDF...')) return;
+
+  let lista = cacheReservas.filter(r => r.estado !== 'cancelada' && r.fecha >= desde && r.fecha <= hasta);
+  lista = lista.sort((a,b) => (a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
+  const filas = lista.map(r => ({
+    fecha: r.fecha, horaInicio: r.horaInicio, horaTermino: r.horaTermino,
+    espacio: r.espacio, nombreSolicitante: r.nombreSolicitante, unidad: r.unidad || '', torre: r.torre || '', notas: r.notas || ''
+  }));
+
+  try{
+    const r = await api('generarPdfReservas', { desde, hasta, filas });
+    ultimoPdfReservasUrl = r.url;
+    document.getElementById('reservas-pdf-link').href = r.url;
+    document.getElementById('reservas-pdf-resultado').style.display = 'block';
+    poblarSelectContactoWhatsappReservas();
+    finCarga(boton, '✔ PDF generado');
+  }catch(e){ finCarga(boton); }
+}
+function poblarSelectContactoWhatsappReservas(){
+  const sel = document.getElementById('reservas-pdf-contacto');
+  const conTelefono = (cacheContactos || []).filter(c => c.telefono);
+  sel.innerHTML = '<option value="">Selecciona un contacto</option>' +
+    conTelefono.map(c => `<option value="${esc(c.telefono)}">${esc(c.nombre)}${c.unidad ? ' — '+esc(c.unidad) : ''}</option>`).join('') +
+    '<option value="otro">Otro número...</option>';
+}
+function enviarReservasPorWhatsapp(){
+  if (!ultimoPdfReservasUrl) return alert('Primero genera el PDF.');
+  const sel = document.getElementById('reservas-pdf-contacto').value;
+  if (!sel) return alert('Selecciona un contacto o "Otro número...".');
+  let numero = sel === 'otro' ? document.getElementById('reservas-pdf-numero').value : sel;
+  numero = String(numero || '').replace(/[^0-9]/g, '');
+  if (!numero) return alert('Escribe un número válido (solo dígitos, con código de país, ej. 56912345678).');
+  const desde = document.getElementById('print-fecha-inicio').value;
+  const hasta = document.getElementById('print-fecha-fin').value;
+  const mensaje = `Hola, te comparto la hoja de reservas del ${desde} al ${hasta} de la Comunidad Jardines de Vicuña Mackenna:\n${ultimoPdfReservasUrl}`;
+  window.open('https://wa.me/' + numero + '?text=' + encodeURIComponent(mensaje), '_blank');
 }
 
 // ========= MUDANZAS =========
@@ -2775,30 +2928,6 @@ function renderMudanzas(){
   if (historial && historial.style.display !== 'none') renderHistorialMudanzas();
 }
 
-function validarRangoFechasMudanzas(){
-  const desde = document.getElementById('mud-print-fecha-inicio').value;
-  const hasta = document.getElementById('mud-print-fecha-fin').value;
-  if (!desde || !hasta){ alert('Selecciona fecha de inicio y de término.'); return null; }
-  if (hasta < desde){ alert('La fecha de término debe ser igual o posterior a la de inicio.'); return null; }
-  return { desde, hasta };
-}
-async function generarPdfConsolidadoMudanzasBtn(){
-  const rango = validarRangoFechasMudanzas();
-  if (!rango) return;
-  try{
-    const r = await api('generarPdfConsolidadoMudanzas', rango);
-    window.open(r.url, '_blank');
-  }catch(e){}
-}
-async function enviarConsolidadoMudanzasWhatsAppBtn(){
-  const rango = validarRangoFechasMudanzas();
-  if (!rango) return;
-  try{
-    const r = await api('generarPdfConsolidadoMudanzas', rango);
-    const mensaje = `Consolidado de Mudanzas (${rango.desde} al ${rango.hasta}) — ${r.total} mudanza(s):\n${r.url}`;
-    window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank');
-  }catch(e){}
-}
 function imprimirMudanzas(){
   const desde = document.getElementById('mud-print-fecha-inicio').value;
   const hasta = document.getElementById('mud-print-fecha-fin').value;
