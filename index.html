@@ -606,6 +606,8 @@
           <div class="form-row"><label>Hasta</label><input type="date" id="mud-print-fecha-fin"></div>
         </div>
         <button class="icon-btn" onclick="imprimirMudanzas()">🖨 Imprimir rango</button>
+        <button class="icon-btn" onclick="generarPdfConsolidadoMudanzasBtn()">📄 Generar PDF</button>
+        <button class="icon-btn" onclick="enviarConsolidadoMudanzasWhatsAppBtn()">📱 Enviar por WhatsApp</button>
       </div>
 
       <div class="card" id="card-pendientes-mudanzas" style="display:none;background:#F7E4E4;border-left:4px solid #C1544B;">
@@ -2251,7 +2253,6 @@ function renderDisponibilidadVisual(){
   const espacio = cacheEspacios.find(e => String(e.id) === espacioId);
   const fechaAnterior = diaAnteriorStr_(fecha);
 
-  // reservas relevantes: las de este día, más las de ayer que cruzan medianoche hacia este día
   const relevantes = cacheReservas.filter(r => String(r.espacio_id) === espacioId && r.estado !== 'cancelada' && (r.fecha === fecha || r.fecha === fechaAnterior));
 
   const bloques = [];
@@ -2262,13 +2263,11 @@ function renderDisponibilidadVisual(){
     if (r.fecha === fecha){
       bloques.push({ inicio: inicio, fin: cruzaMedianoche ? 1440 : fin, r: r, continua: cruzaMedianoche });
     } else if (cruzaMedianoche){
-      // reserva de ayer que se extiende hasta la madrugada de hoy
       bloques.push({ inicio: 0, fin: fin, r: r, vieneDeAyer: true });
     }
   });
   bloques.sort((a,b)=>a.inicio-b.inicio);
 
-  // huecos libres entre los bloques ocupados
   let cursor = 0;
   const huecos = [];
   bloques.forEach(b => {
@@ -2307,8 +2306,6 @@ function agendarEnHueco_(espacioId, fecha, inicioMin, finMin){
   document.getElementById('res-espacio').value = espacioId;
   document.getElementById('res-fecha').value = fecha;
   document.getElementById('res-hora-inicio').value = minutosAHora_(inicioMin);
-  // si el hueco llega hasta el final del día (1440), se deja el término en blanco
-  // para que el admin decida hasta qué hora exacta (podría cruzar medianoche)
   document.getElementById('res-hora-termino').value = finMin < 1440 ? minutosAHora_(finMin) : '';
   document.getElementById('res-form-titulo').textContent = 'Nueva reserva';
   document.querySelector('#reservas-content .card').scrollIntoView({behavior:'smooth'});
@@ -2928,6 +2925,30 @@ function renderMudanzas(){
   if (historial && historial.style.display !== 'none') renderHistorialMudanzas();
 }
 
+function validarRangoFechasMudanzas(){
+  const desde = document.getElementById('mud-print-fecha-inicio').value;
+  const hasta = document.getElementById('mud-print-fecha-fin').value;
+  if (!desde || !hasta){ alert('Selecciona fecha de inicio y de término.'); return null; }
+  if (hasta < desde){ alert('La fecha de término debe ser igual o posterior a la de inicio.'); return null; }
+  return { desde, hasta };
+}
+async function generarPdfConsolidadoMudanzasBtn(){
+  const rango = validarRangoFechasMudanzas();
+  if (!rango) return;
+  try{
+    const r = await api('generarPdfConsolidadoMudanzas', rango);
+    window.open(r.url, '_blank');
+  }catch(e){}
+}
+async function enviarConsolidadoMudanzasWhatsAppBtn(){
+  const rango = validarRangoFechasMudanzas();
+  if (!rango) return;
+  try{
+    const r = await api('generarPdfConsolidadoMudanzas', rango);
+    const mensaje = `Consolidado de Mudanzas (${rango.desde} al ${rango.hasta}) — ${r.total} mudanza(s):\n${r.url}`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank');
+  }catch(e){}
+}
 function imprimirMudanzas(){
   const desde = document.getElementById('mud-print-fecha-inicio').value;
   const hasta = document.getElementById('mud-print-fecha-fin').value;
