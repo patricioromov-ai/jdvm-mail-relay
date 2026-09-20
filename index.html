@@ -499,24 +499,10 @@
             <div class="form-row"><label>Hasta</label><input type="date" id="print-fecha-fin"></div>
           </div>
           <button class="icon-btn" onclick="imprimirReservas()">🖨 Imprimir rango</button>
-          <button class="icon-btn" onclick="generarPdfReservasBtn(this)">📄 Generar PDF</button>
-          <div id="reservas-pdf-resultado" style="display:none;margin-top:12px;padding:12px;background:#EAEAE4;border:1px solid #D8D8D0;border-radius:8px;">
-            <p style="margin:0 0 10px;font-size:0.85rem;">PDF generado: <a id="reservas-pdf-link" href="#" target="_blank">Ver / descargar</a></p>
-            <div class="form-grid">
-              <div class="form-row"><label>Enviar a (contacto)</label>
-                <select id="reservas-pdf-contacto" onchange="document.getElementById('reservas-pdf-numero-row').style.display = this.value==='otro' ? 'block':'none';">
-                  <option value="">Selecciona un contacto</option>
-                  <option value="otro">Otro número...</option>
-                </select>
-              </div>
-              <div class="form-row" id="reservas-pdf-numero-row" style="display:none;">
-                <label>Número (con código de país, sin +, ej. 56912345678)</label>
-                <input type="text" id="reservas-pdf-numero" placeholder="56912345678">
-              </div>
-            </div>
-            <button class="icon-btn" onclick="enviarReservasPorWhatsapp()">📱 Enviar por WhatsApp</button>
-          </div>
+          <button class="icon-btn" onclick="generarPdfReservasBtn()">📄 Generar PDF</button>
+          <button class="icon-btn" onclick="enviarReservasWhatsAppBtn()">📱 Enviar por WhatsApp</button>
         </div>
+
 
         <div class="card">
           <h3>Próximas reservas</h3>
@@ -2517,48 +2503,39 @@ function imprimirReservas(){
   ventana.onload = () => ventana.print();
 }
 
-let ultimoPdfReservasUrl = '';
-async function generarPdfReservasBtn(boton){
+function validarRangoFechasReservas_(){
   const desde = document.getElementById('print-fecha-inicio').value;
   const hasta = document.getElementById('print-fecha-fin').value;
-  if (!desde || !hasta) return alert('Selecciona fecha de inicio y de término.');
-  if (hasta < desde) return alert('La fecha de término debe ser igual o posterior a la de inicio.');
-  if (!iniciarCarga(boton, 'Generando PDF...')) return;
-
+  if (!desde || !hasta){ alert('Selecciona fecha de inicio y de término.'); return null; }
+  if (hasta < desde){ alert('La fecha de término debe ser igual o posterior a la de inicio.'); return null; }
+  return { desde, hasta };
+}
+function armarFilasReservasParaPdf_(desde, hasta){
   let lista = cacheReservas.filter(r => r.estado !== 'cancelada' && r.fecha >= desde && r.fecha <= hasta);
   lista = lista.sort((a,b) => (a.fecha+a.horaInicio).localeCompare(b.fecha+b.horaInicio));
-  const filas = lista.map(r => ({
+  return lista.map(r => ({
     fecha: r.fecha, horaInicio: r.horaInicio, horaTermino: r.horaTermino,
     espacio: r.espacio, nombreSolicitante: r.nombreSolicitante, unidad: r.unidad || '', torre: r.torre || '', notas: r.notas || ''
   }));
-
+}
+async function generarPdfReservasBtn(){
+  const rango = validarRangoFechasReservas_();
+  if (!rango) return;
   try{
-    const r = await api('generarPdfReservas', { desde, hasta, filas });
-    ultimoPdfReservasUrl = r.url;
-    document.getElementById('reservas-pdf-link').href = r.url;
-    document.getElementById('reservas-pdf-resultado').style.display = 'block';
-    poblarSelectContactoWhatsappReservas();
-    finCarga(boton, '✔ PDF generado');
-  }catch(e){ finCarga(boton); }
+    const filas = armarFilasReservasParaPdf_(rango.desde, rango.hasta);
+    const r = await api('generarPdfReservas', { desde: rango.desde, hasta: rango.hasta, filas });
+    window.open(r.url, '_blank');
+  }catch(e){}
 }
-function poblarSelectContactoWhatsappReservas(){
-  const sel = document.getElementById('reservas-pdf-contacto');
-  const conTelefono = (cacheContactos || []).filter(c => c.telefono);
-  sel.innerHTML = '<option value="">Selecciona un contacto</option>' +
-    conTelefono.map(c => `<option value="${esc(c.telefono)}">${esc(c.nombre)}${c.unidad ? ' — '+esc(c.unidad) : ''}</option>`).join('') +
-    '<option value="otro">Otro número...</option>';
-}
-function enviarReservasPorWhatsapp(){
-  if (!ultimoPdfReservasUrl) return alert('Primero genera el PDF.');
-  const sel = document.getElementById('reservas-pdf-contacto').value;
-  if (!sel) return alert('Selecciona un contacto o "Otro número...".');
-  let numero = sel === 'otro' ? document.getElementById('reservas-pdf-numero').value : sel;
-  numero = String(numero || '').replace(/[^0-9]/g, '');
-  if (!numero) return alert('Escribe un número válido (solo dígitos, con código de país, ej. 56912345678).');
-  const desde = document.getElementById('print-fecha-inicio').value;
-  const hasta = document.getElementById('print-fecha-fin').value;
-  const mensaje = `Hola, te comparto la hoja de reservas del ${desde} al ${hasta} de la Comunidad Jardines de Vicuña Mackenna:\n${ultimoPdfReservasUrl}`;
-  window.open('https://wa.me/' + numero + '?text=' + encodeURIComponent(mensaje), '_blank');
+async function enviarReservasWhatsAppBtn(){
+  const rango = validarRangoFechasReservas_();
+  if (!rango) return;
+  try{
+    const filas = armarFilasReservasParaPdf_(rango.desde, rango.hasta);
+    const r = await api('generarPdfReservas', { desde: rango.desde, hasta: rango.hasta, filas });
+    const mensaje = `Hoja de Reservas (${rango.desde} al ${rango.hasta}) — ${r.total} reserva(s):\n${r.url}`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank');
+  }catch(e){}
 }
 
 // ========= MUDANZAS =========
