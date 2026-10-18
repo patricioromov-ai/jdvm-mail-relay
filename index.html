@@ -840,7 +840,7 @@
         <div><h2>Estacionamientos de Cortesía</h2><p>Torre A, subterráneo -1 · 10 cupos · préstamo máx. 1 mes, extensión de 1 mes y un tercer mes solo por excepción</p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="icon-btn" onclick="estAbrirManual()">+ Registrar manualmente</button>
-          <button class="btn-primary" onclick="estAbrirCompartir()">🔗 Compartir formulario</button>
+          <button class="btn-primary" onclick="estAbrirCompartir()">🔗 Generar link de un solo uso</button>
         </div>
       </div>
       <div class="grid-stats" id="est-stats"></div>
@@ -1260,7 +1260,7 @@ function renderEstacionamientos(){
     const opts = libres.length ? libres.map(n=>'<option value="'+n+'">Cupo '+n+'</option>').join('') : '<option value="">Sin cupos libres</option>';
     return '<div style="border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin-bottom:10px;background:#fff;">'+
       '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">'+
-      '<div><b>'+esc(r.nombre)+'</b> · Torre '+esc(r.torre)+' depto '+esc(r.unidad)+'<br>'+
+      '<div><b>'+esc(r.nombre)+'</b> · RUT '+esc(r.rut||'—')+' · Torre '+esc(r.torre)+' depto '+esc(r.unidad)+'<br>'+
       '<span class="mono">'+esc(r.patente)+'</span> · ocupa: '+esc(r.usuario)+'<br>'+
       '<span style="font-size:0.85rem;color:var(--ink-soft);">'+estFmt(r.fechaInicio)+' al '+estFmt(r.fechaFin)+' · '+esc(r.motivo)+'</span><br>'+
       '<span style="font-size:0.85rem;color:var(--ink-soft);">'+esc(r.telefono)+' · '+esc(r.correo)+'</span></div>'+
@@ -1304,7 +1304,7 @@ function renderEstacionamientos(){
       else if (r.estado==='finalizada') estadoTxt='<span class="badge" style="background:#E8E8E2;color:#4A5568;">Finalizada</span>';
       else if (r.estado==='rechazada') estadoTxt='<span class="badge" style="background:#F7E4E4;color:#8F2F28;">Rechazada</span>';
       const eliminar = (r.estado!=='activa') ? '<button class="icon-btn" title="Eliminar registro" onclick="estEliminar(\''+r.id+'\',this)">🗑</button>' : '';
-      return '<tr><td>'+(r.cupo||'—')+'</td><td>'+esc(r.nombre)+'<br><span style="font-size:0.78rem;color:var(--ink-soft);">'+esc(r.torre)+'-'+esc(r.unidad)+' · ocupa: '+esc(r.usuario)+'</span></td><td class="mono">'+esc(r.patente)+'</td>'+
+      return '<tr><td>'+(r.cupo||'—')+'</td><td>'+esc(r.nombre)+'<br><span style="font-size:0.78rem;color:var(--ink-soft);">RUT '+esc(r.rut||'—')+' · '+esc(r.torre)+'-'+esc(r.unidad)+' · ocupa: '+esc(r.usuario)+'</span></td><td class="mono">'+esc(r.patente)+'</td>'+
         '<td class="mono">'+estFmt(estIniReal(r))+' → '+estFmt(r.fechaFin)+'</td><td>'+estadoTxt+'</td><td style="white-space:nowrap;">'+acciones+eliminar+'</td></tr>';
     }).join('')+'</table></div>' : '<p class="empty">Aún no hay solicitudes ni reservas.</p>';
 }
@@ -1344,20 +1344,27 @@ async function estAvisarCorreo(id, btn){
 }
 
 // ----- compartir formulario -----
-async function estAbrirCompartir(){
-  estModal('Compartir formulario', '<p style="color:var(--ink-soft);">Generando enlace...</p>');
+function estAbrirCompartir(){
+  estModal('Generar link de un solo uso',
+    '<p style="color:var(--ink-soft);font-size:0.88rem;margin:0 0 12px;">Cada link sirve para <b>una sola solicitud</b> y vence a los 7 días. Genera uno por cada persona.</p>'+
+    '<div class="form-row"><label>Para quién es (opcional, solo para tu control)</label><input type="text" id="est-para" placeholder="Ej. Juan Pérez, depto A-501" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;"></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;"><button class="icon-btn" onclick="estCerrarModal()">Cancelar</button><button class="btn-primary" onclick="estGenerarLink(this)">Generar link</button></div>');
+}
+async function estGenerarLink(btn){
+  if (!iniciarCarga(btn,'Generando...')) return;
   try{
-    const r = await api('linkEstacionamiento',{});
-    const msg = 'Hola, te comparto el formulario para solicitar un estacionamiento de cortesía en JDVM (Torre A, subterráneo -1). Completa tus datos y sube la foto de la patente aquí: '+r.url;
-    estModal('Compartir formulario',
-      '<div class="form-row"><label>Enlace del formulario</label><input type="text" id="est-link" readonly value="'+esc(r.url)+'" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;"></div>'+
-      '<div class="form-row"><label>Mensaje</label><textarea id="est-msg" readonly style="width:100%;min-height:110px;padding:9px 11px;border:1px solid var(--line);border-radius:5px;font-family:Inter,sans-serif;">'+esc(msg)+'</textarea></div>'+
+    const r = await api('crearLinkEstacionamiento',{ para: document.getElementById('est-para').value });
+    const msg = 'Hola, te comparto el formulario para solicitar un estacionamiento de cortesía en JDVM (Torre A, subterráneo -1). Completa tus datos y sube la foto de la patente aquí: '+r.url+' (el enlace sirve una sola vez y vence el '+estFmt(r.vence)+').';
+    estModal('Link generado',
+      '<div class="form-row"><label>Enlace (un solo uso)</label><input type="text" id="est-link" readonly value="'+esc(r.url)+'" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;"></div>'+
+      '<div class="form-row"><label>Mensaje</label><textarea id="est-msg" readonly style="width:100%;min-height:120px;padding:9px 11px;border:1px solid var(--line);border-radius:5px;font-family:Inter,sans-serif;">'+esc(msg)+'</textarea></div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">'+
       '<button class="icon-btn" onclick="estCerrarModal()">Cerrar</button>'+
+      '<button class="icon-btn" onclick="estAbrirCompartir()">Generar otro</button>'+
       '<button class="icon-btn" onclick="estCopiar(this)">📋 Copiar mensaje</button>'+
       '<a class="icon-btn" style="text-decoration:none;" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(msg)+'">WhatsApp</a>'+
       '<a class="btn-primary" style="text-decoration:none;display:inline-block;" href="mailto:?subject='+encodeURIComponent('Solicitud de estacionamiento de cortesía JDVM')+'&body='+encodeURIComponent(msg)+'">✉ Correo</a></div>');
-  }catch(e){ estCerrarModal(); }
+  }catch(e){ finCarga(btn); }
 }
 function estCopiar(btn){
   const t = document.getElementById('est-msg'); t.select();
@@ -1369,7 +1376,7 @@ function estAbrirManual(){
   const hoy = estHoy();
   const f = (id,label,extra)=>'<div class="form-row"><label>'+label+'</label><input '+(extra||'type="text"')+' id="'+id+'" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;"></div>';
   estModal('Registrar estacionamiento manualmente',
-    '<div class="form-grid">'+f('em-nombre','Nombre del responsable')+
+    '<div class="form-grid">'+f('em-nombre','Nombre del responsable')+f('em-rut','RUT (opcional)')+
     '<div class="form-row"><label>Torre</label><select id="em-torre" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;"><option value="">Elegir</option><option>A</option><option>B</option><option>C</option><option>D</option></select></div>'+
     f('em-unidad','Departamento')+f('em-tel','Teléfono','type="tel"')+f('em-correo','Correo','type="email"')+f('em-usuario','Quién ocupará el estacionamiento')+f('em-patente','Patente')+
     f('em-ini','Fecha de inicio','type="date" value="'+hoy+'"')+f('em-fin','Fecha de término (máx. 1 mes)','type="date"')+'</div>'+
@@ -1390,7 +1397,7 @@ async function estGuardarManual(btn){
   const g = id=>document.getElementById(id).value;
   if (!iniciarCarga(btn,'Guardando...')) return;
   try{
-    await api('addEstacionamiento',{ nombre:g('em-nombre'), torre:g('em-torre'), unidad:g('em-unidad'), telefono:g('em-tel'), correo:g('em-correo'), usuario:g('em-usuario'),
+    await api('addEstacionamiento',{ nombre:g('em-nombre'), rut:g('em-rut'), torre:g('em-torre'), unidad:g('em-unidad'), telefono:g('em-tel'), correo:g('em-correo'), usuario:g('em-usuario'),
       patente:g('em-patente'), motivo:g('em-motivo'), fechaInicio:g('em-ini'), fechaFin:g('em-fin'), cupo:Number(g('em-cupo')) });
     estCerrarModal(); await cargarEstacionamientos();
   }catch(e){ finCarga(btn); }
