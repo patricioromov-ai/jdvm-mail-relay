@@ -1298,6 +1298,7 @@ function renderEstacionamientos(){
         const wa = estTelWa(r.telefono);
         acciones = '<button class="icon-btn" onclick="estVerPdf(\''+r.id+'\',this)">📄 PDF</button> '+
           '<button class="icon-btn" onclick="estEnviarVolantes(\''+r.id+'\',this)">📤 Volantes</button> '+
+          '<button class="icon-btn" onclick="estEnviarPdfWhatsApp(\''+r.id+'\',this)">💬 PDF WhatsApp</button> '+
           (r.mes<3?'<button class="icon-btn" onclick="estExtender(\''+r.id+'\','+r.mes+',this)">'+(r.mes===2?'Extender (excepción)':'Extender 1 mes')+'</button> ':'')+
           (wa?'<a class="icon-btn" style="text-decoration:none;" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(estMsgAviso(r))+'">WhatsApp</a> ':'')+
           (r.correo?'<button class="icon-btn" onclick="estAvisarCorreo(\''+r.id+'\',this)">Correo</button> ':'')+
@@ -1352,6 +1353,17 @@ async function estVerPdf(id, btn){
   if (!iniciarCarga(btn,'Generando...')) return;
   try{ const r = await api('pdfEstacionamiento',{id}); finCarga(btn); window.open(r.verUrl,'_blank'); }catch(e){ finCarga(btn); }
 }
+async function estEnviarPdfWhatsApp(id, btn){
+  const r0 = cacheEstacionamientos.find(x=>String(x.id)===String(id));
+  if (!iniciarCarga(btn,'Generando...')) return;
+  try{
+    const r = await api('pdfEstacionamiento',{id});
+    finCarga(btn);
+    const mensaje = 'Asignación de estacionamiento de cortesía — Cupo '+(r0?r0.cupo:'')+(r0?' · patente '+r0.patente+' · '+r0.nombre+' ('+r0.torre+'-'+r0.unidad+') · hasta '+estFmt(r0.fechaFin):'')+':\n'+r.verUrl;
+    const url = 'https://wa.me/?text='+encodeURIComponent(mensaje);
+    if (!window.open(url,'_blank')) location.href = url;
+  }catch(e){ finCarga(btn); }
+}
 async function estEnviarVolantes(id, btn){
   const previos = (cacheConfig && cacheConfig.correosVolantesEstacionamiento) || '';
   const destinatarios = prompt('¿A qué correo(s) de los volantes enviar el PDF de respaldo? (separa con coma)', previos);
@@ -1381,7 +1393,7 @@ function estAbrirFicha(id){
     inp('motivo','Motivo del uso',r.motivo)+inp('notas','Observaciones (aparecen en el PDF)',r.notas)+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">'+
     '<button class="icon-btn" onclick="estCerrarModal()">Cerrar</button>'+
-    (activa?'<button class="icon-btn" onclick="estVerPdf(\''+r.id+'\',this)">📄 Ver PDF</button><button class="icon-btn" onclick="estEnviarVolantes(\''+r.id+'\',this)">📤 Enviar a volantes</button>':'')+
+    (activa?'<button class="icon-btn" onclick="estVerPdf(\''+r.id+'\',this)">📄 Ver PDF</button><button class="icon-btn" onclick="estEnviarVolantes(\''+r.id+'\',this)">📤 Enviar a volantes</button><button class="icon-btn" onclick="estEnviarPdfWhatsApp(\''+r.id+'\',this)">💬 PDF por WhatsApp</button>':'')+
     '<button class="btn-primary" onclick="estGuardarFicha(\''+r.id+'\',this)">Guardar cambios</button></div>');
 }
 async function estGuardarFicha(id, btn){
