@@ -1296,16 +1296,19 @@ function renderEstacionamientos(){
         const e=estEstadoVenc(r);
         estadoTxt = '<span class="badge" style="background:'+e.bg+';color:'+e.fg+';border:1px solid '+e.bd+';">'+esc(e.txt)+' · mes '+r.mes+'</span>';
         const wa = estTelWa(r.telefono);
-        acciones = (r.mes<3?'<button class="icon-btn" onclick="estExtender(\''+r.id+'\','+r.mes+',this)">'+(r.mes===2?'Extender (excepción)':'Extender 1 mes')+'</button> ':'')+
+        acciones = '<button class="icon-btn" onclick="estVerPdf(\''+r.id+'\',this)">📄 PDF</button> '+
+          '<button class="icon-btn" onclick="estEnviarVolantes(\''+r.id+'\',this)">📤 Volantes</button> '+
+          (r.mes<3?'<button class="icon-btn" onclick="estExtender(\''+r.id+'\','+r.mes+',this)">'+(r.mes===2?'Extender (excepción)':'Extender 1 mes')+'</button> ':'')+
           (wa?'<a class="icon-btn" style="text-decoration:none;" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(estMsgAviso(r))+'">WhatsApp</a> ':'')+
           (r.correo?'<button class="icon-btn" onclick="estAvisarCorreo(\''+r.id+'\',this)">Correo</button> ':'')+
           '<button class="icon-btn" onclick="estFinalizar(\''+r.id+'\',this)">Liberar</button>';
       } else if (r.estado==='solicitada') estadoTxt='<span class="badge" style="background:#F8EBD3;color:#6B4308;">Por revisar</span>';
       else if (r.estado==='finalizada') estadoTxt='<span class="badge" style="background:#E8E8E2;color:#4A5568;">Finalizada</span>';
       else if (r.estado==='rechazada') estadoTxt='<span class="badge" style="background:#F7E4E4;color:#8F2F28;">Rechazada</span>';
+      const ficha = (r.estado==='activa'||r.estado==='solicitada') ? '<button class="icon-btn" onclick="estAbrirFicha(\''+r.id+'\')">📋 Ficha</button> ' : '';
       const eliminar = (r.estado!=='activa') ? '<button class="icon-btn" title="Eliminar registro" onclick="estEliminar(\''+r.id+'\',this)">🗑</button>' : '';
       return '<tr><td>'+(r.cupo||'—')+'</td><td>'+esc(r.nombre)+'<br><span style="font-size:0.78rem;color:var(--ink-soft);">RUT '+esc(r.rut||'—')+' · '+esc(r.torre)+'-'+esc(r.unidad)+' · ocupa: '+esc(r.usuario)+'</span></td><td class="mono">'+esc(r.patente)+'</td>'+
-        '<td class="mono">'+estFmt(estIniReal(r))+' → '+estFmt(r.fechaFin)+'</td><td>'+estadoTxt+'</td><td style="white-space:nowrap;">'+acciones+eliminar+'</td></tr>';
+        '<td class="mono">'+estFmt(estIniReal(r))+' → '+estFmt(r.fechaFin)+'</td><td>'+estadoTxt+'</td><td style="white-space:nowrap;">'+ficha+acciones+eliminar+'</td></tr>';
     }).join('')+'</table></div>' : '<p class="empty">Aún no hay solicitudes ni reservas.</p>';
 }
 
@@ -1341,6 +1344,53 @@ async function estEliminar(id, btn){
 async function estAvisarCorreo(id, btn){
   if (!iniciarCarga(btn,'Enviando...')) return;
   try{ await api('avisarEstacionamiento',{id}); finCarga(btn,'✔ Enviado'); }catch(e){ finCarga(btn); }
+}
+
+
+// ----- respaldo PDF para volantes y ficha editable -----
+async function estVerPdf(id, btn){
+  if (!iniciarCarga(btn,'Generando...')) return;
+  try{ const r = await api('pdfEstacionamiento',{id}); finCarga(btn); window.open(r.verUrl,'_blank'); }catch(e){ finCarga(btn); }
+}
+async function estEnviarVolantes(id, btn){
+  const previos = (cacheConfig && cacheConfig.correosVolantesEstacionamiento) || '';
+  const destinatarios = prompt('¿A qué correo(s) de los volantes enviar el PDF de respaldo? (separa con coma)', previos);
+  if (!destinatarios) return;
+  if (btn && !iniciarCarga(btn,'Enviando...')) return;
+  try{
+    const r = await api('enviarEstacionamientoPorCorreo',{id,destinatarios});
+    if (cacheConfig) cacheConfig.correosVolantesEstacionamiento = r.correos;
+    if (btn) finCarga(btn, r.enviados===r.total ? '✔ Enviado' : '⚠ '+r.enviados+'/'+r.total);
+    else alert(r.enviados===r.total ? '✔ PDF enviado a '+r.enviados+' correo(s).' : 'Se envió a '+r.enviados+' de '+r.total+' correos.');
+  }catch(e){ if (btn) finCarga(btn); }
+}
+function estAbrirFicha(id){
+  const r = cacheEstacionamientos.find(x=>String(x.id)===String(id));
+  if (!r) return;
+  const inp = (key,label,val,extra)=>'<div class="form-row"><label>'+label+'</label><input '+(extra||'type="text"')+' id="ef-'+key+'" value="'+esc(val||'')+'" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;"></div>';
+  const activa = r.estado==='activa';
+  estModal('Ficha · '+(activa?'Cupo '+r.cupo:'Solicitud por revisar'),
+    '<div style="background:#F5F5F0;border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:0.86rem;">'+
+      '<b>Período:</b> '+estFmt(estIniReal(r))+' → '+estFmt(r.fechaFin)+(activa?' · mes '+r.mes+' de 3':'')+'<br>'+
+      '<span style="color:var(--ink-soft);">Las fechas se modifican con "Extender"; el cupo se cambia liberando y registrando de nuevo.</span>'+
+      (r.fotoId?'<br><a target="_blank" rel="noopener" href="https://drive.google.com/file/d/'+esc(r.fotoId)+'/view">📷 Ver foto de la patente</a>':'')+'</div>'+
+    '<div class="form-grid">'+inp('nombre','Nombre del responsable',r.nombre)+inp('rut','RUT',r.rut)+
+    '<div class="form-row"><label>Torre</label><select id="ef-torre" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;">'+['A','B','C','D'].map(t=>'<option'+(t===r.torre?' selected':'')+'>'+t+'</option>').join('')+'</select></div>'+
+    inp('unidad','Departamento',r.unidad)+inp('telefono','Teléfono',r.telefono,'type="tel"')+inp('correo','Correo',r.correo,'type="email"')+
+    inp('usuario','Quién ocupará el estacionamiento',r.usuario)+inp('patente','Patente',r.patente)+'</div>'+
+    inp('motivo','Motivo del uso',r.motivo)+inp('notas','Observaciones (aparecen en el PDF)',r.notas)+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">'+
+    '<button class="icon-btn" onclick="estCerrarModal()">Cerrar</button>'+
+    (activa?'<button class="icon-btn" onclick="estVerPdf(\''+r.id+'\',this)">📄 Ver PDF</button><button class="icon-btn" onclick="estEnviarVolantes(\''+r.id+'\',this)">📤 Enviar a volantes</button>':'')+
+    '<button class="btn-primary" onclick="estGuardarFicha(\''+r.id+'\',this)">Guardar cambios</button></div>');
+}
+async function estGuardarFicha(id, btn){
+  const g = k=>document.getElementById('ef-'+k).value;
+  if (!iniciarCarga(btn,'Guardando...')) return;
+  try{
+    await api('actualizarEstacionamiento',{ id, nombre:g('nombre'), rut:g('rut'), torre:g('torre'), unidad:g('unidad'), telefono:g('telefono'), correo:g('correo'), usuario:g('usuario'), patente:g('patente'), motivo:g('motivo'), notas:g('notas') });
+    estCerrarModal(); await cargarEstacionamientos();
+  }catch(e){ finCarga(btn); }
 }
 
 // ----- compartir formulario -----
