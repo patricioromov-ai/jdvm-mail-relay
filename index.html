@@ -74,6 +74,7 @@
   .form-row select,.form-row input[type=text],.form-row input[type=email],.form-row input[type=datetime-local],.form-row textarea{
     width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:5px;font-family:'Inter',sans-serif;font-size:0.87rem;background:#fff;color:var(--ink);
   }
+  .form-row input[type=date],.form-row input[type=tel]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;font-family:inherit;font-size:0.9rem;}
   .form-row textarea{min-height:90px;font-family:'IBM Plex Mono',monospace;font-size:0.82rem;}
   .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
   .check-group{display:flex;flex-wrap:wrap;gap:10px;}
@@ -168,6 +169,7 @@
       <div class="nav-item" data-view="catastro"><span class="ic">🏠</span> Catastro</div>
       <div class="nav-item" data-view="tarjetas"><span class="ic">🪪</span> Tarjetas Acceso</div>
       <div class="nav-item" data-view="formularios"><span class="ic">📝</span> Formularios</div>
+      <div class="nav-item" data-view="estacionamientos"><span class="ic">🅿️</span> Estacionamientos</div>
       <div class="nav-item" data-view="mensajes"><span class="ic">💬</span> Mensajes</div>
       <div class="nav-item" data-view="anomalias"><span class="ic">⚠</span> Anomalías</div>
       <div class="nav-item" data-view="config"><span class="ic">⚙</span> Configuración</div>
@@ -833,6 +835,30 @@
     </section>
 
     <!-- FORMULARIOS -->
+    <section class="view" id="view-estacionamientos">
+      <div class="topline">
+        <div><h2>Estacionamientos de Cortesía</h2><p>Torre A, subterráneo -1 · 10 cupos · préstamo máx. 1 mes, extensión de 1 mes y un tercer mes solo por excepción</p></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="icon-btn" onclick="estAbrirManual()">+ Registrar manualmente</button>
+          <button class="btn-primary" onclick="estAbrirCompartir()">🔗 Compartir formulario</button>
+        </div>
+      </div>
+      <div class="grid-stats" id="est-stats"></div>
+      <div class="card" id="est-card-solicitudes" style="display:none;">
+        <h3 style="margin-bottom:12px;">Solicitudes por revisar</h3>
+        <div id="est-solicitudes"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:12px;">Cupos</h3>
+        <div id="est-cupos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;"></div>
+        <p style="font-size:0.78rem;color:var(--ink-soft);margin:12px 0 0;">Verde: vigente · Amarillo: vence en 7 días o menos · Rojo: vence en 3 días o menos · Rojo oscuro: vencido (pendiente de liberar).</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:12px;">Historial</h3>
+        <div id="est-historial"></div>
+      </div>
+    </section>
+
     <section class="view" id="view-formularios">
       <div class="topline"><div><h2>Formularios de Inscripción</h2><p>Actividades y eventos con tope de cupos, link público, PDF/Excel y envío por correo</p></div></div>
 
@@ -1173,6 +1199,203 @@ function toggleForm(id){
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
+// ========= ESTACIONAMIENTOS DE CORTESÍA =========
+let cacheEstacionamientos = [];
+const EST_CUPOS = 10;
+function estHoy(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function estDias(iso){ const a=estHoy().split('-').map(Number), b=String(iso).split('-').map(Number); return Math.round((Date.UTC(b[0],b[1]-1,b[2])-Date.UTC(a[0],a[1]-1,a[2]))/864e5); }
+function estFmt(iso){ const p=String(iso||'').split('-'); return p.length===3 ? p[2]+'-'+p[1]+'-'+p[0] : (iso||'—'); }
+function estSolapa(ai,af,bi,bf){ return ai<=bf && bi<=af; }
+function estIniReal(r){ return r.fechaInicioOriginal || r.fechaInicio; }
+function estCuposLibres(ini, fin, excluirId){
+  const ocupados = {};
+  cacheEstacionamientos.forEach(r=>{ if (r.estado==='activa' && String(r.id)!==String(excluirId) && estSolapa(ini,fin,estIniReal(r),r.fechaFin)) ocupados[r.cupo]=true; });
+  const libres=[]; for (let n=1;n<=EST_CUPOS;n++) if(!ocupados[n]) libres.push(n);
+  return libres;
+}
+function estEstadoVenc(r){
+  const d = estDias(r.fechaFin);
+  if (d<0) return {k:'vencido', txt:'Vencido hace '+Math.abs(d)+(Math.abs(d)===1?' día':' días'), bg:'#8F2F28', bd:'#8F2F28', fg:'#fff'};
+  if (d<=3) return {k:'danger', txt:d===0?'Vence hoy':(d===1?'Vence mañana':'Vence en '+d+' días'), bg:'#F7E4E4', bd:'#C1544B', fg:'#8F2F28'};
+  if (d<=7) return {k:'warn', txt:'Vence en '+d+' días', bg:'#F8EBD3', bd:'#C98A2C', fg:'#6B4308'};
+  return {k:'ok', txt:'Vence en '+d+' días', bg:'#E4EEE9', bd:'#8DB8A9', fg:'#1F4D3F'};
+}
+function estTelWa(t){
+  let d=String(t||'').replace(/\D/g,'');
+  if (d.length===8) d='569'+d; else if (d.length===9 && d[0]==='9') d='56'+d;
+  return d;
+}
+function estMsgAviso(r){
+  const d=estDias(r.fechaFin);
+  const cuando = d<0 ? 'venció el '+estFmt(r.fechaFin) : d===0 ? 'vence hoy' : d===1 ? 'vence mañana' : 'vence en '+d+' días ('+estFmt(r.fechaFin)+')';
+  return 'Hola '+r.nombre.split(' ')[0]+', te recordamos que tu préstamo del estacionamiento de cortesía N.º '+r.cupo+' (Torre A, subterráneo -1) '+cuando+'. '+(d<0?'Necesitamos que lo liberes a la brevedad.':'Si necesitas más tiempo, escríbenos antes del vencimiento.')+' Recuerda que es un préstamo por cortesía y la Administración no se hace responsable del cuidado del vehículo.';
+}
+async function cargarEstacionamientos(){
+  try{ cacheEstacionamientos = await api('listEstacionamientos'); renderEstacionamientos(); }catch(e){}
+}
+function estModal(titulo, html){
+  document.getElementById('est-modal-titulo').textContent = titulo;
+  document.getElementById('est-modal-cuerpo').innerHTML = html;
+  document.getElementById('est-modal').style.display = 'flex';
+}
+function estCerrarModal(){ document.getElementById('est-modal').style.display='none'; }
+
+function renderEstacionamientos(){
+  const activas = cacheEstacionamientos.filter(r=>r.estado==='activa');
+  const solicitadas = cacheEstacionamientos.filter(r=>r.estado==='solicitada');
+  const hoy = estHoy();
+  const ocupadosHoy = activas.filter(r=>estSolapa(hoy,hoy,estIniReal(r),r.fechaFin));
+  const porVencer = activas.filter(r=>estDias(r.fechaFin)<=7).length;
+  document.getElementById('est-stats').innerHTML =
+    '<div class="stat-card"><div class="num">'+(EST_CUPOS-ocupadosHoy.length)+'</div><div class="lbl">Cupos libres hoy</div></div>'+
+    '<div class="stat-card"><div class="num">'+ocupadosHoy.length+'</div><div class="lbl">Cupos ocupados</div></div>'+
+    '<div class="stat-card"><div class="num" style="color:'+(porVencer?'#C1544B':'inherit')+'">'+porVencer+'</div><div class="lbl">Vencen en 7 días o menos / vencidos</div></div>'+
+    '<div class="stat-card"><div class="num" style="color:'+(solicitadas.length?'#C98A2C':'inherit')+'">'+solicitadas.length+'</div><div class="lbl">Solicitudes por revisar</div></div>';
+
+  // solicitudes
+  const cardSol = document.getElementById('est-card-solicitudes');
+  cardSol.style.display = solicitadas.length ? 'block' : 'none';
+  document.getElementById('est-solicitudes').innerHTML = solicitadas.map(r=>{
+    const libres = estCuposLibres(r.fechaInicio, r.fechaFin, r.id);
+    const opts = libres.length ? libres.map(n=>'<option value="'+n+'">Cupo '+n+'</option>').join('') : '<option value="">Sin cupos libres</option>';
+    return '<div style="border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin-bottom:10px;background:#fff;">'+
+      '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">'+
+      '<div><b>'+esc(r.nombre)+'</b> · Torre '+esc(r.torre)+' depto '+esc(r.unidad)+'<br>'+
+      '<span class="mono">'+esc(r.patente)+'</span> · ocupa: '+esc(r.usuario)+'<br>'+
+      '<span style="font-size:0.85rem;color:var(--ink-soft);">'+estFmt(r.fechaInicio)+' al '+estFmt(r.fechaFin)+' · '+esc(r.motivo)+'</span><br>'+
+      '<span style="font-size:0.85rem;color:var(--ink-soft);">'+esc(r.telefono)+' · '+esc(r.correo)+'</span></div>'+
+      '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">'+
+      (r.fotoId?'<a class="icon-btn" style="text-decoration:none;" target="_blank" rel="noopener" href="https://drive.google.com/file/d/'+esc(r.fotoId)+'/view">📷 Ver foto patente</a>':'')+
+      '<div style="display:flex;gap:6px;"><select id="est-cupo-'+r.id+'" style="padding:6px;border:1px solid var(--line);border-radius:5px;">'+opts+'</select>'+
+      '<button class="btn-primary" style="padding:7px 14px;" '+(libres.length?'':'disabled')+' onclick="estAprobar(\''+r.id+'\',this)">Aprobar</button>'+
+      '<button class="icon-btn" onclick="estRechazar(\''+r.id+'\',this)">Rechazar</button></div></div></div></div>';
+  }).join('');
+
+  // cupos
+  let html='';
+  for (let n=1;n<=EST_CUPOS;n++){
+    const r = activas.filter(x=>x.cupo===n).sort((a,b)=>a.fechaFin<b.fechaFin?-1:1)[0];
+    if (!r){ html += '<div style="background:#fff;border:1px dashed #A9A9A0;border-radius:8px;padding:12px;min-height:128px;"><div style="font-weight:600;">Cupo '+n+'</div><div style="color:var(--ink-soft);font-size:0.85rem;margin-top:6px;">Libre</div></div>'; continue; }
+    const e = estEstadoVenc(r);
+    const reservaFutura = estDias(estIniReal(r))>0;
+    html += '<div style="background:'+e.bg+';border:1.5px solid '+e.bd+';color:'+e.fg+';border-radius:8px;padding:12px;min-height:128px;">'+
+      '<div style="display:flex;justify-content:space-between;"><b>Cupo '+n+'</b><span style="font-size:0.72rem;font-weight:600;">Mes '+r.mes+' de 3</span></div>'+
+      '<div style="margin-top:6px;font-size:0.9rem;font-weight:600;">'+esc(r.nombre)+'</div>'+
+      '<div style="font-size:0.8rem;">'+esc(r.torre)+'-'+esc(r.unidad)+' · <span class="mono">'+esc(r.patente)+'</span></div>'+
+      '<div style="font-size:0.8rem;margin-top:4px;">'+(reservaFutura?'Desde '+estFmt(estIniReal(r))+' · ':'')+'Hasta '+estFmt(r.fechaFin)+'</div>'+
+      '<div style="font-size:0.78rem;font-weight:600;margin-top:2px;">'+(reservaFutura?'Reservado':e.txt)+'</div></div>';
+  }
+  document.getElementById('est-cupos').innerHTML = html;
+
+  // historial / detalle
+  const filas = cacheEstacionamientos.slice().sort((a,b)=> (b.fechaSolicitud||'')>(a.fechaSolicitud||'')?1:-1);
+  document.getElementById('est-historial').innerHTML = filas.length ? '<div style="overflow-x:auto;"><table><tr><th>Cupo</th><th>Responsable</th><th>Patente</th><th>Período</th><th>Estado</th><th>Acciones</th></tr>'+
+    filas.map(r=>{
+      let estadoTxt = r.estado, acciones='';
+      if (r.estado==='activa'){
+        const e=estEstadoVenc(r);
+        estadoTxt = '<span class="badge" style="background:'+e.bg+';color:'+e.fg+';border:1px solid '+e.bd+';">'+esc(e.txt)+' · mes '+r.mes+'</span>';
+        const wa = estTelWa(r.telefono);
+        acciones = (r.mes<3?'<button class="icon-btn" onclick="estExtender(\''+r.id+'\','+r.mes+',this)">'+(r.mes===2?'Extender (excepción)':'Extender 1 mes')+'</button> ':'')+
+          (wa?'<a class="icon-btn" style="text-decoration:none;" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(estMsgAviso(r))+'">WhatsApp</a> ':'')+
+          (r.correo?'<button class="icon-btn" onclick="estAvisarCorreo(\''+r.id+'\',this)">Correo</button> ':'')+
+          '<button class="icon-btn" onclick="estFinalizar(\''+r.id+'\',this)">Liberar</button>';
+      } else if (r.estado==='solicitada') estadoTxt='<span class="badge" style="background:#F8EBD3;color:#6B4308;">Por revisar</span>';
+      else if (r.estado==='finalizada') estadoTxt='<span class="badge" style="background:#E8E8E2;color:#4A5568;">Finalizada</span>';
+      else if (r.estado==='rechazada') estadoTxt='<span class="badge" style="background:#F7E4E4;color:#8F2F28;">Rechazada</span>';
+      const eliminar = (r.estado!=='activa') ? '<button class="icon-btn" title="Eliminar registro" onclick="estEliminar(\''+r.id+'\',this)">🗑</button>' : '';
+      return '<tr><td>'+(r.cupo||'—')+'</td><td>'+esc(r.nombre)+'<br><span style="font-size:0.78rem;color:var(--ink-soft);">'+esc(r.torre)+'-'+esc(r.unidad)+' · ocupa: '+esc(r.usuario)+'</span></td><td class="mono">'+esc(r.patente)+'</td>'+
+        '<td class="mono">'+estFmt(estIniReal(r))+' → '+estFmt(r.fechaFin)+'</td><td>'+estadoTxt+'</td><td style="white-space:nowrap;">'+acciones+eliminar+'</td></tr>';
+    }).join('')+'</table></div>' : '<p class="empty">Aún no hay solicitudes ni reservas.</p>';
+}
+
+async function estAprobar(id, btn){
+  const cupo = document.getElementById('est-cupo-'+id).value;
+  if (!cupo) return;
+  if (!iniciarCarga(btn,'Aprobando...')) return;
+  try{ await api('aprobarEstacionamiento',{id,cupo:Number(cupo)}); await cargarEstacionamientos(); }catch(e){ finCarga(btn); }
+}
+async function estRechazar(id, btn){
+  const motivo = prompt('Motivo del rechazo (se incluye en el correo al residente; puede quedar vacío):');
+  if (motivo===null) return;
+  if (!iniciarCarga(btn,'...')) return;
+  try{ await api('rechazarEstacionamiento',{id,motivo}); await cargarEstacionamientos(); }catch(e){ finCarga(btn); }
+}
+async function estExtender(id, mes, btn){
+  const excepcion = mes===2;
+  const msg = excepcion ? 'Este es el TERCER mes y solo se autoriza por excepción. Después no podrá extenderse más. ¿Confirmas la excepción?' : '¿Extender el préstamo 1 mes más?';
+  if (!confirm(msg)) return;
+  if (!iniciarCarga(btn,'Extendiendo...')) return;
+  try{ await api('extenderEstacionamiento',{id,excepcion}); await cargarEstacionamientos(); }catch(e){ finCarga(btn); }
+}
+async function estFinalizar(id, btn){
+  if (!confirm('¿Marcar el estacionamiento como liberado? El cupo quedará disponible.')) return;
+  if (!iniciarCarga(btn,'...')) return;
+  try{ await api('finalizarEstacionamiento',{id}); await cargarEstacionamientos(); }catch(e){ finCarga(btn); }
+}
+async function estEliminar(id, btn){
+  if (!confirm('¿Eliminar este registro definitivamente?')) return;
+  if (!iniciarCarga(btn,'...')) return;
+  try{ await api('deleteEstacionamiento',{id}); await cargarEstacionamientos(); }catch(e){ finCarga(btn); }
+}
+async function estAvisarCorreo(id, btn){
+  if (!iniciarCarga(btn,'Enviando...')) return;
+  try{ await api('avisarEstacionamiento',{id}); finCarga(btn,'✔ Enviado'); }catch(e){ finCarga(btn); }
+}
+
+// ----- compartir formulario -----
+async function estAbrirCompartir(){
+  estModal('Compartir formulario', '<p style="color:var(--ink-soft);">Generando enlace...</p>');
+  try{
+    const r = await api('linkEstacionamiento',{});
+    const msg = 'Hola, te comparto el formulario para solicitar un estacionamiento de cortesía en JDVM (Torre A, subterráneo -1). Completa tus datos y sube la foto de la patente aquí: '+r.url;
+    estModal('Compartir formulario',
+      '<div class="form-row"><label>Enlace del formulario</label><input type="text" id="est-link" readonly value="'+esc(r.url)+'" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;"></div>'+
+      '<div class="form-row"><label>Mensaje</label><textarea id="est-msg" readonly style="width:100%;min-height:110px;padding:9px 11px;border:1px solid var(--line);border-radius:5px;font-family:Inter,sans-serif;">'+esc(msg)+'</textarea></div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">'+
+      '<button class="icon-btn" onclick="estCerrarModal()">Cerrar</button>'+
+      '<button class="icon-btn" onclick="estCopiar(this)">📋 Copiar mensaje</button>'+
+      '<a class="icon-btn" style="text-decoration:none;" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(msg)+'">WhatsApp</a>'+
+      '<a class="btn-primary" style="text-decoration:none;display:inline-block;" href="mailto:?subject='+encodeURIComponent('Solicitud de estacionamiento de cortesía JDVM')+'&body='+encodeURIComponent(msg)+'">✉ Correo</a></div>');
+  }catch(e){ estCerrarModal(); }
+}
+function estCopiar(btn){
+  const t = document.getElementById('est-msg'); t.select();
+  navigator.clipboard.writeText(t.value).then(()=>{ const o=btn.textContent; btn.textContent='✔ Copiado'; setTimeout(()=>{btn.textContent=o;},1500); }).catch(()=>{ document.execCommand('copy'); });
+}
+
+// ----- registro manual -----
+function estAbrirManual(){
+  const hoy = estHoy();
+  const f = (id,label,extra)=>'<div class="form-row"><label>'+label+'</label><input '+(extra||'type="text"')+' id="'+id+'" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;"></div>';
+  estModal('Registrar estacionamiento manualmente',
+    '<div class="form-grid">'+f('em-nombre','Nombre del responsable')+
+    '<div class="form-row"><label>Torre</label><select id="em-torre" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;"><option value="">Elegir</option><option>A</option><option>B</option><option>C</option><option>D</option></select></div>'+
+    f('em-unidad','Departamento')+f('em-tel','Teléfono','type="tel"')+f('em-correo','Correo','type="email"')+f('em-usuario','Quién ocupará el estacionamiento')+f('em-patente','Patente')+
+    f('em-ini','Fecha de inicio','type="date" value="'+hoy+'"')+f('em-fin','Fecha de término (máx. 1 mes)','type="date"')+'</div>'+
+    f('em-motivo','Motivo del uso')+
+    '<div class="form-row"><label>Cupo</label><select id="em-cupo" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:5px;"></select></div>'+
+    '<p style="font-size:0.78rem;color:var(--ink-soft);">Teléfono y correo son opcionales en el registro manual, pero sin ellos no se podrán enviar avisos.</p>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;"><button class="icon-btn" onclick="estCerrarModal()">Cancelar</button><button class="btn-primary" onclick="estGuardarManual(this)">Guardar</button></div>');
+  ['em-ini','em-fin'].forEach(id=>document.getElementById(id).addEventListener('change', estActualizarCuposManual));
+  estActualizarCuposManual();
+}
+function estActualizarCuposManual(){
+  const i=document.getElementById('em-ini').value, f=document.getElementById('em-fin').value, sel=document.getElementById('em-cupo');
+  if (!i||!f||f<i){ sel.innerHTML='<option value="">Elige las fechas primero</option>'; return; }
+  const libres = estCuposLibres(i,f);
+  sel.innerHTML = libres.length ? libres.map(n=>'<option value="'+n+'">Cupo '+n+'</option>').join('') : '<option value="">Sin cupos libres</option>';
+}
+async function estGuardarManual(btn){
+  const g = id=>document.getElementById(id).value;
+  if (!iniciarCarga(btn,'Guardando...')) return;
+  try{
+    await api('addEstacionamiento',{ nombre:g('em-nombre'), torre:g('em-torre'), unidad:g('em-unidad'), telefono:g('em-tel'), correo:g('em-correo'), usuario:g('em-usuario'),
+      patente:g('em-patente'), motivo:g('em-motivo'), fechaInicio:g('em-ini'), fechaFin:g('em-fin'), cupo:Number(g('em-cupo')) });
+    estCerrarModal(); await cargarEstacionamientos();
+  }catch(e){ finCarga(btn); }
+}
+
 // ========= CARGA INICIAL =========
 async function cargarTodo(){
   try{
@@ -1185,6 +1408,7 @@ async function cargarTodo(){
   }catch(e){ /* el error ya se muestra en el banner */ }
 }
 cargarTodo();
+cargarEstacionamientos();
 
 // ========= PANEL =========
 function renderPanel(){
@@ -4697,6 +4921,13 @@ async function catExportar(boton){
 
 <div id="ficha-overlay" class="ficha-overlay" role="dialog" aria-modal="true" aria-label="Ficha de contacto">
   <div class="ficha-card" id="ficha-contenido"></div>
+</div>
+
+<div id="est-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;padding:20px;overflow:auto;">
+  <div style="background:#fff;border-radius:10px;padding:22px;max-width:560px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:92vh;overflow:auto;">
+    <h3 id="est-modal-titulo" style="font-family:'Fraunces',serif;font-size:1.1rem;margin-bottom:12px;"></h3>
+    <div id="est-modal-cuerpo"></div>
+  </div>
 </div>
 
 <div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;padding:20px;">
