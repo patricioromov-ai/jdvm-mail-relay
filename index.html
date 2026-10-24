@@ -839,6 +839,7 @@
       <div class="topline">
         <div><h2>Estacionamientos de Cortesía</h2><p>Torre A, subterráneo -1 · 10 cupos · préstamo máx. 1 mes, extensión de 1 mes y un tercer mes solo por excepción</p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="icon-btn" onclick="estAbrirResumen()">🚗 Resumen de vehículos</button>
           <button class="icon-btn" onclick="estAbrirManual()">+ Registrar manualmente</button>
           <button class="btn-primary" onclick="estAbrirCompartir()">🔗 Generar link de un solo uso</button>
         </div>
@@ -848,13 +849,22 @@
         <h3 style="margin-bottom:12px;">Solicitudes por revisar</h3>
         <div id="est-solicitudes"></div>
       </div>
+      <div class="card" id="est-card-alertas" style="display:none;border-left:4px solid #C1544B;">
+        <h3 style="margin-bottom:10px;">Revisión de datos</h3>
+        <div id="est-alertas"></div>
+      </div>
       <div class="card">
         <h3 style="margin-bottom:12px;">Cupos</h3>
         <div id="est-cupos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;"></div>
         <p style="font-size:0.78rem;color:var(--ink-soft);margin:12px 0 0;">Verde: vigente · Amarillo: vence en 7 días o menos · Rojo: vence en 3 días o menos · Rojo oscuro: vencido (pendiente de liberar).</p>
       </div>
       <div class="card">
-        <h3 style="margin-bottom:12px;">Historial</h3>
+        <h3 style="margin-bottom:12px;">Reservas y historial</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+          <button class="filtro-tab filtro-est active" data-f="vigentes" onclick="estFiltrar('vigentes')">Vigentes y próximas</button>
+          <button class="filtro-tab filtro-est" data-f="todas" onclick="estFiltrar('todas')">Todo el historial</button>
+          <input type="text" id="est-buscar" placeholder="Buscar nombre, patente, depto o RUT" oninput="renderEstacionamientos()" style="flex:1;min-width:200px;padding:8px 10px;border:1px solid var(--line);border-radius:5px;font-family:inherit;">
+        </div>
         <div id="est-historial"></div>
       </div>
     </section>
@@ -1245,7 +1255,7 @@ function renderEstacionamientos(){
   const solicitadas = cacheEstacionamientos.filter(r=>r.estado==='solicitada');
   const hoy = estHoy();
   const ocupadosHoy = activas.filter(r=>estSolapa(hoy,hoy,estIniReal(r),r.fechaFin));
-  const porVencer = activas.filter(r=>estDias(r.fechaFin)<=7).length;
+  const porVencer = activas.filter(r=>estIniReal(r)<=hoy && estDias(r.fechaFin)<=7).length;
   document.getElementById('est-stats').innerHTML =
     '<div class="stat-card"><div class="num">'+(EST_CUPOS-ocupadosHoy.length)+'</div><div class="lbl">Cupos libres hoy</div></div>'+
     '<div class="stat-card"><div class="num">'+ocupadosHoy.length+'</div><div class="lbl">Cupos ocupados</div></div>'+
@@ -1271,46 +1281,139 @@ function renderEstacionamientos(){
       '<button class="icon-btn" onclick="estRechazar(\''+r.id+'\',this)">Rechazar</button></div></div></div></div>';
   }).join('');
 
-  // cupos
+  // ---- cruce por cupo: ocupante actual, vencido sin liberar y próxima reserva ----
   let html='';
   for (let n=1;n<=EST_CUPOS;n++){
-    const r = activas.filter(x=>x.cupo===n).sort((a,b)=>a.fechaFin<b.fechaFin?-1:1)[0];
-    if (!r){ html += '<div style="background:#fff;border:1px dashed #A9A9A0;border-radius:8px;padding:12px;min-height:128px;"><div style="font-weight:600;">Cupo '+n+'</div><div style="color:var(--ink-soft);font-size:0.85rem;margin-top:6px;">Libre</div></div>'; continue; }
-    const e = estEstadoVenc(r);
-    const reservaFutura = estDias(estIniReal(r))>0;
+    const delCupo = activas.filter(x=>x.cupo===n).sort((a,b)=>estIniReal(a)<estIniReal(b)?-1:1);
+    const actual = delCupo.find(x=>estIniReal(x)<=hoy && x.fechaFin>=hoy);
+    const vencido = delCupo.filter(x=>x.fechaFin<hoy).pop();
+    const proxima = delCupo.find(x=>estIniReal(x)>hoy);
+    const ocupante = actual || vencido;
+    const linkProx = proxima ? '<div style="font-size:0.76rem;margin-top:6px;padding-top:6px;border-top:1px dashed currentColor;">Próxima: <b>'+esc(proxima.nombre)+'</b> · '+esc(proxima.patente)+'<br>'+estFmt(estIniReal(proxima))+' al '+estFmt(proxima.fechaFin)+'</div>' : '';
+    if (!ocupante){
+      html += '<div style="background:#fff;border:1px '+(proxima?'solid #C98A2C':'dashed #A9A9A0')+';border-radius:8px;padding:12px;min-height:128px;color:var(--ink);"><div style="font-weight:600;">Cupo '+n+'</div><div style="color:var(--ink-soft);font-size:0.85rem;margin-top:6px;">Libre hoy</div>'+linkProx+'</div>';
+      continue;
+    }
+    const e = estEstadoVenc(ocupante);
+    const conflicto = vencido && !actual && proxima && estDias(estIniReal(proxima))<=3;
     html += '<div style="background:'+e.bg+';border:1.5px solid '+e.bd+';color:'+e.fg+';border-radius:8px;padding:12px;min-height:128px;">'+
-      '<div style="display:flex;justify-content:space-between;"><b>Cupo '+n+'</b><span style="font-size:0.72rem;font-weight:600;">Mes '+r.mes+' de 3</span></div>'+
-      '<div style="margin-top:6px;font-size:0.9rem;font-weight:600;">'+esc(r.nombre)+'</div>'+
-      '<div style="font-size:0.8rem;">'+esc(r.torre)+'-'+esc(r.unidad)+' · <span class="mono">'+esc(r.patente)+'</span></div>'+
-      '<div style="font-size:0.8rem;margin-top:4px;">'+(reservaFutura?'Desde '+estFmt(estIniReal(r))+' · ':'')+'Hasta '+estFmt(r.fechaFin)+'</div>'+
-      '<div style="font-size:0.78rem;font-weight:600;margin-top:2px;">'+(reservaFutura?'Reservado':e.txt)+'</div></div>';
+      '<div style="display:flex;justify-content:space-between;"><b>Cupo '+n+'</b><span style="font-size:0.72rem;font-weight:600;">Mes '+ocupante.mes+' de 3</span></div>'+
+      '<div style="margin-top:6px;font-size:0.9rem;font-weight:600;">'+esc(ocupante.nombre)+'</div>'+
+      '<div style="font-size:0.8rem;">'+esc(ocupante.torre)+'-'+esc(ocupante.unidad)+' · <span class="mono">'+esc(ocupante.patente)+'</span></div>'+
+      '<div style="font-size:0.8rem;margin-top:4px;">Hasta '+estFmt(ocupante.fechaFin)+'</div>'+
+      '<div style="font-size:0.78rem;font-weight:600;margin-top:2px;">'+e.txt+(vencido&&!actual?' · liberar':'')+'</div>'+
+      linkProx+(conflicto?'<div style="font-size:0.76rem;font-weight:700;margin-top:4px;">⚠ Debe liberarse antes del '+estFmt(estIniReal(proxima))+'</div>':'')+'</div>';
   }
   document.getElementById('est-cupos').innerHTML = html;
 
-  // historial / detalle
-  const filas = cacheEstacionamientos.slice().sort((a,b)=> (b.fechaSolicitud||'')>(a.fechaSolicitud||'')?1:-1);
+  // ---- revisión de datos (cruces y faltantes) ----
+  const alertas = [];
+  const fichaBtn = id=>'<button class="icon-btn" onclick="estAbrirFicha(\''+id+'\')">Ficha</button>';
+  const liberaBtn = id=>'<button class="icon-btn" onclick="estFinalizar(\''+id+'\',this)">Liberar</button>';
+  const nom = r=>'<b>'+esc(r.nombre)+'</b> ('+esc(r.torre)+'-'+esc(r.unidad)+', '+esc(r.patente)+')';
+  activas.filter(r=>r.fechaFin<hoy).forEach(r=>alertas.push({g:3, t:'Cupo '+r.cupo+': '+nom(r)+' venció el '+estFmt(r.fechaFin)+' y sigue sin liberarse.', b:liberaBtn(r.id)+' '+fichaBtn(r.id)}));
+  for (let n=1;n<=EST_CUPOS;n++){
+    const dc = activas.filter(x=>x.cupo===n);
+    const venc = dc.filter(x=>x.fechaFin<hoy);
+    const prox = dc.filter(x=>estIniReal(x)>hoy && estDias(estIniReal(x))<=3).sort((a,b)=>estIniReal(a)<estIniReal(b)?-1:1)[0];
+    if (venc.length && prox && !dc.some(x=>estIniReal(x)<=hoy && x.fechaFin>=hoy)) alertas.push({g:3, t:'Cupo '+n+': '+esc(prox.nombre)+' llega el '+estFmt(estIniReal(prox))+' y el cupo aún figura ocupado por '+esc(venc[venc.length-1].nombre)+'.', b:''});
+  }
+  const porDepto = {};
+  activas.filter(r=>estIniReal(r)<=hoy && r.fechaFin>=hoy).forEach(r=>{ const k=(r.torre+'-'+r.unidad).toUpperCase(); (porDepto[k]=porDepto[k]||[]).push(r); });
+  Object.keys(porDepto).forEach(k=>{ if (porDepto[k].length>1) alertas.push({g:2, t:'El depto '+esc(k)+' tiene '+porDepto[k].length+' cupos en uso a la vez (cupos '+porDepto[k].map(r=>r.cupo).join(', ')+').', b:''}); });
+  const porRut = {};
+  activas.filter(r=>r.rut && estIniReal(r)<=hoy && r.fechaFin>=hoy).forEach(r=>{ (porRut[r.rut]=porRut[r.rut]||[]).push(r); });
+  Object.keys(porRut).forEach(k=>{ const deptos=new Set(porRut[k].map(r=>r.torre+'-'+r.unidad)); if (porRut[k].length>1 && deptos.size>1) alertas.push({g:2, t:'El RUT '+esc(k)+' aparece en '+porRut[k].length+' cupos de distintos deptos.', b:''}); });
+  activas.forEach(r=>{
+    const falta=[]; if(!r.rut) falta.push('RUT'); if(!r.telefono) falta.push('teléfono'); if(!r.correo) falta.push('correo'); if(!r.fotoId) falta.push('foto de patente');
+    if (falta.length) alertas.push({g:1, t:'Cupo '+r.cupo+': '+nom(r)+' sin '+falta.join(', ')+'.', b:fichaBtn(r.id)});
+  });
+  solicitadas.filter(r=>r.fechaSolicitud && estDias(r.fechaSolicitud)<=-2).forEach(r=>alertas.push({g:2, t:'Solicitud de '+esc(r.nombre)+' lleva '+Math.abs(estDias(r.fechaSolicitud))+' días sin revisarse.', b:''}));
+  activas.filter(r=>estDias(estIniReal(r))>=0 && estDias(estIniReal(r))<=1).forEach(r=>alertas.push({g:1, t:'Cupo '+r.cupo+': '+nom(r)+' comienza '+(estDias(estIniReal(r))===0?'hoy':'mañana')+' ('+estFmt(estIniReal(r))+').', b:''}));
+  alertas.sort((a,b)=>b.g-a.g);
+  const colores={3:'#8F2F28',2:'#6B4308',1:'#4A5568'};
+  document.getElementById('est-card-alertas').style.display = alertas.length ? 'block' : 'none';
+  document.getElementById('est-alertas').innerHTML = alertas.map(a=>'<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:0.86rem;color:'+colores[a.g]+';"><span>'+(a.g===3?'🔴 ':a.g===2?'🟠 ':'⚪ ')+a.t+'</span><span style="white-space:nowrap;">'+a.b+'</span></div>').join('');
+
+  // ---- historial: vigentes primero, ordenado por cupo; con filtro y búsqueda ----
+  const q = (document.getElementById('est-buscar').value||'').toLowerCase().trim();
+  const vigente = r => r.estado==='solicitada' || (r.estado==='activa');
+  let filas = cacheEstacionamientos.filter(r=> estFiltro==='todas' ? true : vigente(r));
+  if (q) filas = filas.filter(r=>[r.nombre,r.patente,r.unidad,r.torre+r.unidad,r.torre+'-'+r.unidad,r.rut,r.usuario].join(' ').toLowerCase().indexOf(q)!==-1);
+  const rank = r => r.estado==='solicitada'?0 : r.estado==='activa'?1 : 2;
+  filas.sort((a,b)=> rank(a)-rank(b) || ((a.cupo||99)-(b.cupo||99)) || (estIniReal(a)<estIniReal(b)?-1:1));
   document.getElementById('est-historial').innerHTML = filas.length ? '<div style="overflow-x:auto;"><table><tr><th>Cupo</th><th>Responsable</th><th>Patente</th><th>Período</th><th>Estado</th><th>Acciones</th></tr>'+
     filas.map(r=>{
       let estadoTxt = r.estado, acciones='';
       if (r.estado==='activa'){
-        const e=estEstadoVenc(r);
-        estadoTxt = '<span class="badge" style="background:'+e.bg+';color:'+e.fg+';border:1px solid '+e.bd+';">'+esc(e.txt)+' · mes '+r.mes+'</span>';
+        const e = estEstadoVenc(r);
+        const futura = estDias(estIniReal(r))>0;
+        estadoTxt = futura ? '<span class="badge" style="background:#E8EEF7;color:#1F2A44;border:1px solid #9DB0D0;">Próxima · desde '+estFmt(estIniReal(r))+'</span>' : '<span class="badge" style="background:'+e.bg+';color:'+e.fg+';border:1px solid '+e.bd+';">'+esc(e.txt)+' · mes '+r.mes+'</span>';
         const wa = estTelWa(r.telefono);
-        acciones = '<button class="icon-btn" onclick="estVerPdf(\''+r.id+'\',this)">📄 PDF</button> '+
-          '<button class="icon-btn" onclick="estEnviarVolantes(\''+r.id+'\',this)">📤 Volantes</button> '+
-          '<button class="icon-btn" onclick="estEnviarPdfWhatsApp(\''+r.id+'\',this)">💬 PDF WhatsApp</button> '+
-          (r.mes<3?'<button class="icon-btn" onclick="estExtender(\''+r.id+'\','+r.mes+',this)">'+(r.mes===2?'Extender (excepción)':'Extender 1 mes')+'</button> ':'')+
-          (wa?'<a class="icon-btn" style="text-decoration:none;" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(estMsgAviso(r))+'">WhatsApp</a> ':'')+
-          (r.correo?'<button class="icon-btn" onclick="estAvisarCorreo(\''+r.id+'\',this)">Correo</button> ':'')+
-          '<button class="icon-btn" onclick="estFinalizar(\''+r.id+'\',this)">Liberar</button>';
+        acciones = (r.mes<3?'<button class="icon-btn" onclick="estExtender(\''+r.id+'\','+r.mes+',this)">'+(r.mes===2?'Extender (excepción)':'Extender 1 mes')+'</button> ':'')+
+          '<details style="display:inline-block;vertical-align:top;"><summary class="icon-btn" style="display:inline-block;cursor:pointer;list-style:none;">Más ▾</summary>'+
+          '<div style="display:flex;flex-direction:column;gap:5px;margin-top:6px;align-items:stretch;">'+
+          '<button class="icon-btn" onclick="estVerPdf(\''+r.id+'\',this)">📄 Ver PDF</button>'+
+          '<button class="icon-btn" onclick="estEnviarVolantes(\''+r.id+'\',this)">📤 PDF a volantes</button>'+
+          '<button class="icon-btn" onclick="estEnviarPdfWhatsApp(\''+r.id+'\',this)">💬 PDF por WhatsApp</button>'+
+          (wa?'<a class="icon-btn" style="text-decoration:none;text-align:center;" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(estMsgAviso(r))+'">📱 Avisar al residente</a>':'')+
+          (r.correo?'<button class="icon-btn" onclick="estAvisarCorreo(\''+r.id+'\',this)">✉ Avisar por correo</button>':'')+
+          '<button class="icon-btn" onclick="estFinalizar(\''+r.id+'\',this)">Liberar cupo</button></div></details>';
       } else if (r.estado==='solicitada') estadoTxt='<span class="badge" style="background:#F8EBD3;color:#6B4308;">Por revisar</span>';
       else if (r.estado==='finalizada') estadoTxt='<span class="badge" style="background:#E8E8E2;color:#4A5568;">Finalizada</span>';
       else if (r.estado==='rechazada') estadoTxt='<span class="badge" style="background:#F7E4E4;color:#8F2F28;">Rechazada</span>';
       const ficha = (r.estado==='activa'||r.estado==='solicitada') ? '<button class="icon-btn" onclick="estAbrirFicha(\''+r.id+'\')">📋 Ficha</button> ' : '';
       const eliminar = (r.estado!=='activa') ? '<button class="icon-btn" title="Eliminar registro" onclick="estEliminar(\''+r.id+'\',this)">🗑</button>' : '';
-      return '<tr><td>'+(r.cupo||'—')+'</td><td>'+esc(r.nombre)+'<br><span style="font-size:0.78rem;color:var(--ink-soft);">RUT '+esc(r.rut||'—')+' · '+esc(r.torre)+'-'+esc(r.unidad)+' · ocupa: '+esc(r.usuario)+'</span></td><td class="mono">'+esc(r.patente)+'</td>'+
-        '<td class="mono">'+estFmt(estIniReal(r))+' → '+estFmt(r.fechaFin)+'</td><td>'+estadoTxt+'</td><td style="white-space:nowrap;">'+ficha+acciones+eliminar+'</td></tr>';
-    }).join('')+'</table></div>' : '<p class="empty">Aún no hay solicitudes ni reservas.</p>';
+      return '<tr><td>'+(r.cupo||'—')+'</td><td>'+esc(r.nombre)+'<br><span style="font-size:0.78rem;color:var(--ink-soft);">RUT '+(r.rut?esc(r.rut):'<b style="color:#C1544B;">falta</b>')+' · '+esc(r.torre)+'-'+esc(r.unidad)+' · ocupa: '+esc(r.usuario)+'</span></td><td class="mono">'+esc(r.patente)+'</td>'+
+        '<td class="mono">'+estFmt(estIniReal(r))+' → '+estFmt(r.fechaFin)+'</td><td>'+estadoTxt+'</td><td><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start;min-width:150px;">'+ficha+acciones+eliminar+'</div></td></tr>';
+    }).join('')+'</table></div>' : '<p class="empty">'+(q?'Sin resultados para la búsqueda.':'No hay reservas vigentes.')+'</p>';
+}
+let estFiltro = 'vigentes';
+function estFiltrar(f){
+  estFiltro = f;
+  document.querySelectorAll('.filtro-est').forEach(b=>b.classList.toggle('active', b.dataset.f===f));
+  renderEstacionamientos();
+}
+
+// ----- resumen de vehículos -----
+async function estAbrirResumen(){
+  estModal('Resumen de vehículos','<p style="color:var(--ink-soft);">Armando resumen...</p>');
+  try{
+    const r = await api('resumenEstacionamientos',{});
+    estModal('Resumen de vehículos',
+      '<textarea id="est-resumen-txt" readonly style="width:100%;min-height:260px;padding:10px;border:1px solid var(--line);border-radius:6px;font-family:Inter,sans-serif;font-size:0.84rem;line-height:1.45;">'+esc(r.texto)+'</textarea>'+
+      '<p style="font-size:0.78rem;color:var(--ink-soft);margin:6px 0 12px;">Se arma con los datos actuales: en uso hoy, vencidos sin liberar y próximas reservas.</p>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">'+
+      '<button class="icon-btn" onclick="estCerrarModal()">Cerrar</button>'+
+      '<button class="icon-btn" onclick="estCopiarResumen(this)">📋 Copiar</button>'+
+      '<button class="icon-btn" onclick="estResumenWhatsApp(false,this)">💬 WhatsApp (texto)</button>'+
+      '<button class="icon-btn" onclick="estResumenWhatsApp(true,this)">💬 WhatsApp (PDF)</button>'+
+      '<button class="btn-primary" onclick="estResumenCorreo(this)">✉ Enviar por correo</button></div>');
+  }catch(e){ estCerrarModal(); }
+}
+function estCopiarResumen(btn){
+  const t = document.getElementById('est-resumen-txt'); t.select();
+  navigator.clipboard.writeText(t.value).then(()=>{ const o=btn.textContent; btn.textContent='✔ Copiado'; setTimeout(()=>{btn.textContent=o;},1500); }).catch(()=>{ document.execCommand('copy'); });
+}
+async function estResumenWhatsApp(conPdf, btn){
+  let mensaje = document.getElementById('est-resumen-txt').value;
+  if (conPdf){
+    if (!iniciarCarga(btn,'Generando PDF...')) return;
+    try{ const r = await api('pdfResumenEstacionamientos',{}); finCarga(btn); mensaje = 'Resumen de estacionamientos de cortesía (Torre A, -1) al '+estFmt(estHoy())+':\n'+r.verUrl; }catch(e){ finCarga(btn); return; }
+  }
+  const url = 'https://wa.me/?text='+encodeURIComponent(mensaje);
+  if (!window.open(url,'_blank')) location.href = url;
+}
+async function estResumenCorreo(btn){
+  const previos = (cacheConfig && cacheConfig.correosVolantesEstacionamiento) || '';
+  const destinatarios = prompt('¿A qué correo(s) enviar el resumen en PDF? (separa con coma)', previos);
+  if (!destinatarios) return;
+  if (!iniciarCarga(btn,'Enviando...')) return;
+  try{
+    const r = await api('enviarResumenEstacionamientosPorCorreo',{destinatarios});
+    if (cacheConfig) cacheConfig.correosVolantesEstacionamiento = r.correos;
+    finCarga(btn, r.enviados===r.total ? '✔ Enviado' : '⚠ '+r.enviados+'/'+r.total);
+  }catch(e){ finCarga(btn); }
 }
 
 async function estAprobar(id, btn){
